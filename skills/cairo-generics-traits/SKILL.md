@@ -17,8 +17,16 @@ Provide conceptual guidance on generics and traits, including when to use them a
 - Identify duplicated logic that generics can remove.
 - Explain that each concrete type produces a specialized implementation.
 - Mention traits as behavior constraints for generic types.
+- For generic impls, remind users to add required trait bounds (`+Drop<T>`, `+Copy<T>`).
+- For generic structs, remind users to add `#[derive(Drop, Copy)]`.
+
+## Common Pitfalls
+- **Missing trait bounds**: Generic impls need `+Drop<T>` and often `+Copy<T>` in the impl signature.
+- **Missing derives**: Generic structs need `#[derive(Drop, Copy)]` to work with the trait bounds.
+- **Syntax**: Use `impl Foo<T, +Drop<T>, +Copy<T>> of MyTrait<T>` (note the `+` prefix).
 
 ## Example Requests
 - "Why did my contract get bigger after adding generics?"
 - "What do generics and traits buy me in Cairo?"
 - "How do trait bounds relate to generics?"
+- "My generic implementation won't compile"

@@ -1,0 +1,22 @@
+# Prompt ID: cairo-generics-traits-01
+
+Task:
+- Write a minimal Cairo `lib.cairo` that demonstrates a generic trait and an implementation.
+
+Requirements:
+- Define a generic struct `Pair<T>` with fields `first: T` and `second: T`.
+- Define a trait `Swap<T>` with a function `swap(self: Pair<T>) -> Pair<T>`.
+- Implement `Swap<T>` for `Pair<T>` so it returns a new `Pair<T>` with the fields swapped.
+- Include a small `fn demo() -> Pair<u32>` that constructs a pair and calls the swap function.
+
+Constraints:
+- Must compile as a library file.
+- No extra modules. Tests are required.
+
+Technical Notes:
+- Generic structs need `#[derive(Drop, Copy)]` to work with generic implementations.
+- Generic impl must include trait bounds: `impl PairSwap<T, +Drop<T>, +Copy<T>> of Swap<T>`.
+- The project's `Scarb.toml` must NOT have `enable-gas = false` (this breaks snforge tests).
+
+Deliverable:
+- Only the code for `src/lib.cairo`.
