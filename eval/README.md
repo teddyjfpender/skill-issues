@@ -89,3 +89,4 @@ Example prompt included:
 - `eval/scaffold.sh` runs `scarb new`/`scarb init` with `--no-vcs` and defaults to `--test-runner none`. Set `SCARB_INIT_TEST_RUNNER=starknet-foundry` if you want Foundry test scaffolding.
 - If a work dir already exists but lacks `Scarb.toml`, scaffolding uses `scarb init` in place.
 - Scarb package names are sanitized to lowercase and underscores (hyphens become underscores).
+- `eval/scaffold.sh` normalizes `Scarb.toml` to include `[cairo]`, `[scripts]`, and `[dependencies]` with the required settings.

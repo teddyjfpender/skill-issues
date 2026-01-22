@@ -40,14 +40,17 @@ scarb_args=(--no-vcs --test-runner "$test_runner" --name "$pkg_name")
 if [[ -d "$dest_dir" ]]; then
   if [[ -f "$dest_dir/Scarb.toml" ]]; then
     echo "Scarb project already exists: $dest_dir"
+    python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ensure_scarb_toml.py" "$dest_dir/Scarb.toml"
     exit 0
   fi
   mkdir -p "$dest_dir"
   (cd "$dest_dir" && scarb init "${scarb_args[@]}")
+  python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ensure_scarb_toml.py" "$dest_dir/Scarb.toml"
   echo "scaffolded Scarb project (init): $dest_dir"
   exit 0
 fi
 
 scarb new "${scarb_args[@]}" "$dest_dir"
+python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ensure_scarb_toml.py" "$dest_dir/Scarb.toml"
 
 echo "scaffolded Scarb project: $dest_dir"
