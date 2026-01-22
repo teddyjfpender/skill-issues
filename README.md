@@ -6,14 +6,14 @@ This repo includes packaged Codex skills under `skills/` and `dist/`. Use **one*
 
 ```bash
 mkdir -p ~/.codex/skills
-cp -R /Users/theodorepender/Coding/thoth/skills/cairo-* ~/.codex/skills/
+cp -R ./skills/cairo-* ~/.codex/skills/
 ```
 
 ## Option B — Repo-scoped (checked into this repo)
 
 ```bash
-mkdir -p /Users/theodorepender/Coding/thoth/.codex/skills
-cp -R /Users/theodorepender/Coding/thoth/skills/cairo-* /Users/theodorepender/Coding/thoth/.codex/skills/
+mkdir -p ./.codex/skills
+cp -R ./skills/cairo-* ./.codex/skills/
 ```
 
 ## Using packaged `.skill` files
@@ -22,7 +22,7 @@ If you prefer the packaged `.skill` archives (zip files), unzip them into a skil
 
 ```bash
 mkdir -p ~/.codex/skills
-unzip /Users/theodorepender/Coding/thoth/dist/cairo-*.skill -d ~/.codex/skills
+unzip ./dist/cairo-*.skill -d ~/.codex/skills
 ```
 
 ## Notes
