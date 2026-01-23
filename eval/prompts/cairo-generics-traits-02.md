@@ -1,0 +1,41 @@
+# Prompt ID: cairo-generics-traits-02
+
+Task:
+- Implement a generic `MinStack<T>` data structure in Cairo that supports push, pop, peek, and get_min operations, all in O(1) time.
+
+Requirements:
+- Define a generic struct `MinStack<T>` that internally uses two `Array<T>` fields: one for the main stack and one for tracking minimums.
+- Define a trait `MinStackTrait<T>` with these methods:
+  - `fn new() -> MinStack<T>` - creates an empty stack
+  - `fn push(ref self: MinStack<T>, value: T)` - pushes a value onto the stack
+  - `fn pop(ref self: MinStack<T>) -> Option<T>` - removes and returns the top element
+  - `fn peek(self: @MinStack<T>) -> Option<T>` - returns the top element without removing
+  - `fn get_min(self: @MinStack<T>) -> Option<T>` - returns the minimum element in O(1)
+  - `fn is_empty(self: @MinStack<T>) -> bool` - returns true if stack is empty
+- Implement `MinStackTrait<T>` for `MinStack<T>` with appropriate generic bounds.
+- The `get_min` operation must be O(1), not O(n). This requires maintaining a parallel stack of minimums.
+
+Algorithm Hint:
+- When pushing: if the new value is <= current min (or stack is empty), also push to min_stack.
+- When popping: if the popped value equals current min, also pop from min_stack.
+- `get_min` simply peeks the min_stack.
+
+Constraints:
+- Must compile as a library file.
+- Tests are required demonstrating:
+  1. Push several values including duplicates of the minimum
+  2. Verify get_min returns correct minimum after each operation
+  3. Pop values and verify min updates correctly
+  4. Edge cases: empty stack operations return None
+
+Technical Notes:
+- Generic structs need `#[derive(Drop)]` (not Copy, since Arrays don't implement Copy).
+- Generic impl needs bounds: `+Drop<T>, +Copy<T>, +PartialOrd<T>, +PartialEq<T>` for comparison operations.
+- Use `@array[array.len() - 1]` pattern for peek operations on arrays.
+- Arrays use `append` for push and `pop_front` returns from the wrong end - you'll need to work around this or use `Span` operations creatively.
+
+Alternative Implementation Note:
+- Since Cairo arrays don't support efficient pop from back, you may implement using array reversal on pop, or use a simpler approach where pop rebuilds the array. The key constraint is that get_min must still be O(1).
+
+Deliverable:
+- Only the code for `src/lib.cairo`.

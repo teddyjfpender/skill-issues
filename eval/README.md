@@ -80,6 +80,15 @@ Example prompt included:
 - `eval/prompts/cairo-generics-traits-01.md`
 - `eval/rubric/cairo-generics-traits-01.md`
 
+## Cleanup
+
+To remove generated examples and clean up your directory:
+```bash
+eval/clean.sh
+```
+
+This removes both `eval/work/` and `eval/results/` directories.
+
 ## Notes
 
 - The verifier expects a Scarb project with `Scarb.toml`.

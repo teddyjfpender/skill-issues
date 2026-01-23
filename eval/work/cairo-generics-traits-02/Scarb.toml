@@ -1,0 +1,17 @@
+[package]
+name = "cairo_generics_traits_02"
+version = "0.1.0"
+edition = "2024_07"
+
+[cairo]
+enable-gas = true
+
+[scripts]
+test = "snforge test"
+
+[dependencies]
+cairo_execute = "2.14.0"
+snforge_std = "0.55.0"
+
+[dev-dependencies]
+snforge_std = "0.55.0"
