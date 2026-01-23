@@ -1,0 +1,13 @@
+   Compiling snforge_scarb_plugin v0.55.0
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `release` profile [optimized] target(s) in 0.13s
+   Compiling cairo_fixed_point_q128_01 v0.1.0 (/Users/theodorepender/Coding/skill-issues/eval/work/cairo-fixed-point-q128-01/Scarb.toml)
+error: executable target cannot be compiled with enabled gas calculation
+help: if you want to disable gas calculation, consider adding following
+excerpt to your package manifest
+    -> Scarb.toml
+        [cairo]
+        enable-gas = false
+error: could not compile `cairo_fixed_point_q128_01` due to 1 previous error

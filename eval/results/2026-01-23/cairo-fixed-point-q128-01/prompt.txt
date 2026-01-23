@@ -1,0 +1,153 @@
+$cairo-structs
+$cairo-operator-overloading
+$cairo-data-types
+$cairo-traits
+$cairo-testing
+
+Return JSON only with shape {"code": string, "notes": string}. Put any caveats in "notes" (empty string ok). Do not include Markdown or code fences.
+
+# Prompt ID: cairo-fixed-point-q128-01
+
+Task:
+- Implement a Q128.128 signed fixed-point number type in Cairo for deterministic on-chain arithmetic.
+
+## Overview
+
+Q128.128 is a fixed-point representation where:
+- **128 integer bits** (signed, two's complement)
+- **128 fractional bits**
+- Stored as a single `i256` raw value
+- Real value = `raw / 2^128`
+- ULP (unit in last place) = `2^-128`
+
+This format is ideal for DeFi applications requiring exact arithmetic without floating-point non-determinism.
+
+## Type Definition
+
+```
+struct SQ128x128 {
+    raw: i256  // signed 256-bit two's complement
+}
+```
+
+The scaling factor `S = 2^128` means:
+- Top 128 bits = integer part (with sign)
+- Bottom 128 bits = fractional part
+
+## Value Range
+
+For signed `raw ∈ [-2^255, 2^255 - 1]`:
+- **Minimum**: `-2^127` (when `raw = -2^255`)
+- **Maximum**: `2^127 - 2^-128` (when `raw = 2^255 - 1`)
+
+## Required Constants
+
+Implement these as associated constants or functions:
+- `ZERO`: raw = 0
+- `ONE`: raw = 2^128
+- `NEG_ONE`: raw = -2^128
+- `MIN`: raw = -2^255 (minimum representable value)
+- `MAX`: raw = 2^255 - 1 (maximum representable value)
+
+## Required Operations
+
+### Construction & Conversion
+- `from_raw(raw: i256) -> SQ128x128` - wrap raw value
+- `to_raw(self) -> i256` - extract raw value
+- `from_int(n: i128) -> SQ128x128` - convert integer (raw = n * 2^128), overflow-checked
+
+### Comparison
+- Implement `PartialEq` and `PartialOrd` based on raw value comparison
+
+### Addition & Subtraction (Exact)
+- `add(a, b) -> SQ128x128` - exact addition with overflow check
+- `sub(a, b) -> SQ128x128` - exact subtraction with overflow check
+
+Overflow conditions:
+- Addition: same signs but result has different sign
+- Subtraction: different signs but result sign doesn't match minuend
+
+### Delta (Signed Difference)
+- `delta(a, b) -> SQ128x128` - returns `b - a`
+- Property: `a + delta(a, b) == b` (when no overflow)
+
+### Multiplication (Core Challenge)
+
+Multiplication requires 512-bit intermediate precision:
+```
+exact_product = (a.raw * b.raw) / 2^128
+```
+
+Since `a.raw * b.raw` produces a 512-bit result, you must:
+1. Compute the full 512-bit signed product
+2. Divide by 2^128 (shift right by 128 bits)
+3. Apply rounding
+4. Check result fits in i256
+
+Implement two rounding modes:
+- `mul_down(a, b)` - round toward -∞ (floor)
+- `mul_up(a, b)` - round toward +∞ (ceiling)
+
+Rounding rules for `mul_down`:
+- If product ≥ 0: `raw_out = product >> 128` (truncate)
+- If product < 0 and remainder ≠ 0: `raw_out = (product >> 128) - 1`
+- If product < 0 and remainder = 0: `raw_out = product >> 128`
+
+Rounding rules for `mul_up`:
+- If product ≥ 0 and remainder ≠ 0: `raw_out = (product >> 128) + 1`
+- If product ≥ 0 and remainder = 0: `raw_out = product >> 128`
+- If product < 0: `raw_out = product >> 128` (truncate toward zero, which is ceiling for negatives)
+
+**Critical multiplication identities** (must hold):
+- `mul_*(x, ONE) == x` for any x
+- `mul_*(x, ZERO) == ZERO` for any x
+- `mul_down(a, b) <= exact(a * b) <= mul_up(a, b)`
+- `mul_up(a, b).raw - mul_down(a, b).raw ∈ {0, 1}`
+
+## 512-bit Arithmetic Hint
+
+Cairo doesn't have native 512-bit integers. Implement using limb arithmetic:
+- Represent 256-bit as 4 × 64-bit limbs (or 2 × 128-bit)
+- 256×256 multiplication produces 8 × 64-bit limbs (512-bit result)
+- Implement signed multiplication via unsigned multiply + sign handling
+
+## Error Handling
+
+All operations MUST be overflow-checked. On overflow:
+- Panic/revert (preferred for on-chain determinism)
+- Or return `Option<SQ128x128>` with `None` on overflow
+
+## Required Tests
+
+### Constant Tests
+- Verify ZERO, ONE, NEG_ONE, MIN, MAX have correct raw values
+
+### Addition/Subtraction Edge Cases
+- `MAX + one_ulp` overflows
+- `MIN - one_ulp` overflows
+- `MAX + NEG_MAX == ZERO`
+- `MIN + MIN` overflows
+
+### Delta Tests
+- `delta(a, a) == ZERO`
+- `a + delta(a, b) == b` for various values
+
+### Multiplication Tests
+- `ONE * ONE == ONE`
+- `ONE * x == x` for x ∈ {MIN, NEG_ONE, ZERO, ONE, MAX}
+- `NEG_ONE * NEG_ONE == ONE`
+- `NEG_ONE * ONE == NEG_ONE`
+- `MAX * ONE == MAX`
+- Test rounding: values where `a.raw * b.raw` has non-zero lower 128 bits
+- Test negative products with remainders
+
+## Constraints
+
+- Must compile with `scarb build`
+- Must pass all tests with `snforge test`
+- Use generics/traits where appropriate
+- No external dependencies beyond core Cairo
+
+## Deliverable
+
+- Only the code for `src/lib.cairo`

@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+log_info() {
+  echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_step() {
+  echo -e "${CYAN}[STEP]${NC} $1"
+}
+
+log_success() {
+  echo -e "${GREEN}[OK]${NC} $1"
+}
+
+log_warn() {
+  echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+  echo -e "${RED}[ERROR]${NC} $1"
+}
+
 usage() {
   cat <<'USAGE'
 Usage: eval/run-prompt.sh --prompt <id|path> [options]
@@ -115,6 +143,12 @@ fi
 prompt_id="$(basename "$prompt_path")"
 prompt_id="${prompt_id%.md}"
 
+echo ""
+log_info "=========================================="
+log_info "  Eval Runner: $prompt_id"
+log_info "=========================================="
+echo ""
+
 if [[ -z "$work_dir" ]]; then
   work_dir="$script_dir/work/$prompt_id"
 fi
@@ -129,8 +163,14 @@ fi
 
 mkdir -p "$results_dir"
 
+log_step "Setting up directories..."
+log_info "  Work dir: $work_dir"
+log_info "  Results dir: $results_dir"
+
 if [[ $no_scaffold -eq 0 && ! -f "$work_dir/Scarb.toml" ]]; then
+  log_step "Scaffolding new Scarb project..."
   "$script_dir/scaffold.sh" "$work_dir"
+  log_success "Scaffold complete"
 fi
 
 mkdir -p "$(dirname "$out_file")"
@@ -153,6 +193,19 @@ if [[ -n "$schema_arg" ]]; then
 fi
 
 prompt_file="$results_dir/prompt.txt"
+
+log_step "Building prompt..."
+log_info "  Prompt: $prompt_path"
+if [[ ${#skills[@]} -gt 0 ]]; then
+  log_info "  Skills (${#skills[@]}): ${skills[*]}"
+fi
+if [[ -n "$schema_path" ]]; then
+  log_info "  Schema: $schema_path"
+fi
+if [[ -n "$model" ]]; then
+  log_info "  Model: $model"
+fi
+
 {
   if [[ ${#skills[@]} -gt 0 ]]; then
     for s in "${skills[@]}"; do
@@ -165,6 +218,7 @@ prompt_file="$results_dir/prompt.txt"
   fi
   cat "$prompt_path"
 } > "$prompt_file"
+log_success "Prompt saved to $prompt_file"
 
 last_message="$results_dir/assistant_last.txt"
 codex_jsonl="$results_dir/codex.jsonl"
@@ -187,12 +241,28 @@ if [[ ${#extra_args[@]} -gt 0 ]]; then
   codex_args+=("${extra_args[@]}")
 fi
 
+echo ""
+log_step "Running Codex..."
+log_info "  Command: codex ${codex_args[*]}"
+log_info "  Started at: $start_iso"
+echo ""
+echo -e "${YELLOW}--- Codex Output ---${NC}"
+
 set +e
-codex "${codex_args[@]}" < "$prompt_file" > "$codex_jsonl" 2> "$codex_stderr"
-codex_status=$?
+codex "${codex_args[@]}" < "$prompt_file" 2> "$codex_stderr" | tee "$codex_jsonl"
+codex_status=${PIPESTATUS[0]}
 set -e
 
+echo -e "${YELLOW}--- End Codex Output ---${NC}"
+echo ""
+
 end_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+log_info "  Finished at: $end_iso"
+if [[ $codex_status -eq 0 ]]; then
+  log_success "Codex completed successfully"
+else
+  log_warn "Codex exited with status $codex_status"
+fi
 
 export RUN_PROMPT_ID="$prompt_id"
 export RUN_PROMPT_PATH="$prompt_path"
@@ -212,27 +282,43 @@ export RUN_CODEX_STDERR="$codex_stderr"
 export RUN_LAST_MESSAGE="$last_message"
 export RUN_CODEX_ARGS="${codex_args[*]}"
 
+log_step "Writing run metadata..."
 python3 "$script_dir/write_run_metadata.py" "$results_dir/run.json"
+log_success "Metadata saved to $results_dir/run.json"
 
 if [[ ! -s "$last_message" ]]; then
-  echo "no assistant output written; see $codex_stderr" >&2
+  log_error "No assistant output written"
+  log_info "Check stderr: $codex_stderr"
   exit 1
 fi
 
+log_step "Extracting code..."
 if [[ -n "$schema_path" ]]; then
   python3 "$script_dir/extract_code.py" "$last_message" "$out_file"
+  log_success "Code extracted to $out_file"
 else
   cp "$last_message" "$out_file"
+  log_success "Output copied to $out_file"
 fi
 
 if [[ $no_verify -eq 0 ]]; then
+  echo ""
+  log_step "Running verification..."
+  echo -e "${YELLOW}--- Verification Output ---${NC}"
   "$script_dir/verify.sh" "$work_dir" "$results_dir"
+  echo -e "${YELLOW}--- End Verification ---${NC}"
+  log_success "Verification complete"
 fi
 
 if [[ $codex_status -ne 0 ]]; then
-  echo "codex exec failed with status $codex_status" >&2
+  log_error "Codex exec failed with status $codex_status"
   exit $codex_status
 fi
 
-echo "output: $out_file"
-echo "results: $results_dir"
+echo ""
+log_info "=========================================="
+log_success "Run complete!"
+log_info "=========================================="
+log_info "  Output file: $out_file"
+log_info "  Results dir: $results_dir"
+echo ""
