@@ -1,8 +1,8 @@
 //! # SQ128x128 Fixed-Point Arithmetic Library
 //!
 //! This module provides a signed Q128.128 fixed-point number type for precise
-//! decimal arithmetic on Starknet. The representation uses sign-magnitude format
-//! with 128 integer bits and 128 fractional bits.
+//! binary fixed-point arithmetic on Starknet. The representation uses sign-magnitude
+//! format with 128 integer bits and 128 fractional bits.
 //!
 //! ## Features
 //! - Full signed arithmetic: add, sub, mul with configurable rounding
@@ -79,7 +79,6 @@ const U256_MAX_NEG_MAG: U256 = U256 {
 
 const I256_ZERO: I256 = I256 { mag: U256_ZERO, neg: false };
 const I256_RAW_ONE: I256 = I256 { mag: U256_ONE, neg: false };
-const I256_RAW_NEG_ONE: I256 = I256 { mag: U256_ONE, neg: true };
 const I256_SCALE: I256 = I256 { mag: U256_SCALE, neg: false };
 const I256_NEG_SCALE: I256 = I256 { mag: U256_SCALE, neg: true };
 const I256_MIN: I256 = I256 { mag: U256_MAX_NEG_MAG, neg: true };
@@ -113,10 +112,6 @@ struct U512 {
     limb5: u64,
     limb6: u64,
     limb7: u64,
-}
-
-fn u256_zero() -> U256 {
-    U256_ZERO
 }
 
 fn u256_is_zero(value: U256) -> bool {
@@ -165,9 +160,9 @@ fn u64_from_u128(value: u128) -> u64 {
 
 fn add_u64_with_carry(a: u64, b: u64, carry: u64) -> (u64, u64) {
     let sum: u128 = u128_from_u64(a) + u128_from_u64(b) + u128_from_u64(carry);
-    let low: u128 = sum & 0xFFFFFFFFFFFFFFFF_u128;
-    let high: u128 = sum / 0x1_0000_0000_0000_0000_u128;
-    (u64_from_u128(low), u64_from_u128(high))
+    let low: u64 = (sum & 0xFFFFFFFFFFFFFFFF_u128).try_into().unwrap();
+    let high: u64 = (sum / TWO_POW_64).try_into().unwrap();
+    (low, high)
 }
 
 fn sub_u64_with_borrow(a: u64, b: u64, borrow: u64) -> (u64, u64) {
@@ -206,9 +201,9 @@ fn u256_sub(a: U256, b: U256) -> (U256, bool) {
 }
 
 fn u128_split_to_u64(value: u128) -> (u64, u64) {
-    let low: u128 = value & 0xFFFFFFFFFFFFFFFF_u128;
-    let high: u128 = value / 0x1_0000_0000_0000_0000_u128;
-    (u64_from_u128(low), u64_from_u128(high))
+    let low: u64 = (value & 0xFFFFFFFFFFFFFFFF_u128).try_into().unwrap();
+    let high: u64 = (value / TWO_POW_64).try_into().unwrap();
+    (low, high)
 }
 
 fn u512_zero() -> U512 {
@@ -224,296 +219,86 @@ fn u512_zero() -> U512 {
     }
 }
 
-fn u512_add_one_from(mut acc: U512, start: u8) -> U512 {
-    if start == 0_u8 {
-        let (l0, c0) = add_u64_with_carry(acc.limb0, 0_u64, 1_u64);
-        acc.limb0 = l0;
-        if c0 == 0_u64 {
-            return acc;
-        }
-        let (l1, c1) = add_u64_with_carry(acc.limb1, 0_u64, 1_u64);
-        acc.limb1 = l1;
-        if c1 == 0_u64 {
-            return acc;
-        }
-        let (l2, c2) = add_u64_with_carry(acc.limb2, 0_u64, 1_u64);
-        acc.limb2 = l2;
-        if c2 == 0_u64 {
-            return acc;
-        }
-        let (l3, c3) = add_u64_with_carry(acc.limb3, 0_u64, 1_u64);
-        acc.limb3 = l3;
-        if c3 == 0_u64 {
-            return acc;
-        }
-        let (l4, c4) = add_u64_with_carry(acc.limb4, 0_u64, 1_u64);
-        acc.limb4 = l4;
-        if c4 == 0_u64 {
-            return acc;
-        }
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 1_u8 {
-        let (l1, c1) = add_u64_with_carry(acc.limb1, 0_u64, 1_u64);
-        acc.limb1 = l1;
-        if c1 == 0_u64 {
-            return acc;
-        }
-        let (l2, c2) = add_u64_with_carry(acc.limb2, 0_u64, 1_u64);
-        acc.limb2 = l2;
-        if c2 == 0_u64 {
-            return acc;
-        }
-        let (l3, c3) = add_u64_with_carry(acc.limb3, 0_u64, 1_u64);
-        acc.limb3 = l3;
-        if c3 == 0_u64 {
-            return acc;
-        }
-        let (l4, c4) = add_u64_with_carry(acc.limb4, 0_u64, 1_u64);
-        acc.limb4 = l4;
-        if c4 == 0_u64 {
-            return acc;
-        }
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 2_u8 {
-        let (l2, c2) = add_u64_with_carry(acc.limb2, 0_u64, 1_u64);
-        acc.limb2 = l2;
-        if c2 == 0_u64 {
-            return acc;
-        }
-        let (l3, c3) = add_u64_with_carry(acc.limb3, 0_u64, 1_u64);
-        acc.limb3 = l3;
-        if c3 == 0_u64 {
-            return acc;
-        }
-        let (l4, c4) = add_u64_with_carry(acc.limb4, 0_u64, 1_u64);
-        acc.limb4 = l4;
-        if c4 == 0_u64 {
-            return acc;
-        }
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 3_u8 {
-        let (l3, c3) = add_u64_with_carry(acc.limb3, 0_u64, 1_u64);
-        acc.limb3 = l3;
-        if c3 == 0_u64 {
-            return acc;
-        }
-        let (l4, c4) = add_u64_with_carry(acc.limb4, 0_u64, 1_u64);
-        acc.limb4 = l4;
-        if c4 == 0_u64 {
-            return acc;
-        }
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 4_u8 {
-        let (l4, c4) = add_u64_with_carry(acc.limb4, 0_u64, 1_u64);
-        acc.limb4 = l4;
-        if c4 == 0_u64 {
-            return acc;
-        }
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 5_u8 {
-        let (l5, c5) = add_u64_with_carry(acc.limb5, 0_u64, 1_u64);
-        acc.limb5 = l5;
-        if c5 == 0_u64 {
-            return acc;
-        }
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 6_u8 {
-        let (l6, c6) = add_u64_with_carry(acc.limb6, 0_u64, 1_u64);
-        acc.limb6 = l6;
-        if c6 == 0_u64 {
-            return acc;
-        }
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    if start == 7_u8 {
-        let (l7, c7) = add_u64_with_carry(acc.limb7, 0_u64, 1_u64);
-        acc.limb7 = l7;
-        assert!(c7 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    assert!(false, "u512 overflow");
+// Helper to get a limb by index (0-7 for U512)
+fn u512_get_limb(value: @U512, idx: u32) -> u64 {
+    if idx == 0 { *value.limb0 }
+    else if idx == 1 { *value.limb1 }
+    else if idx == 2 { *value.limb2 }
+    else if idx == 3 { *value.limb3 }
+    else if idx == 4 { *value.limb4 }
+    else if idx == 5 { *value.limb5 }
+    else if idx == 6 { *value.limb6 }
+    else { *value.limb7 }
+}
+
+// Helper to set a limb by index
+fn u512_set_limb(ref value: U512, idx: u32, limb: u64) {
+    if idx == 0 { value.limb0 = limb; return; }
+    if idx == 1 { value.limb1 = limb; return; }
+    if idx == 2 { value.limb2 = limb; return; }
+    if idx == 3 { value.limb3 = limb; return; }
+    if idx == 4 { value.limb4 = limb; return; }
+    if idx == 5 { value.limb5 = limb; return; }
+    if idx == 6 { value.limb6 = limb; return; }
+    value.limb7 = limb;
+}
+
+// Helper to get a limb by index (0-3 for U256)
+fn u256_get_limb(value: @U256, idx: u32) -> u64 {
+    if idx == 0 { *value.limb0 }
+    else if idx == 1 { *value.limb1 }
+    else if idx == 2 { *value.limb2 }
+    else { *value.limb3 }
+}
+
+// Clean loop-based add-one-from
+fn u512_add_one_from(mut acc: U512, start: u32) -> U512 {
+    let mut carry: u64 = 1;
+    let mut i: u32 = start;
+    while i < 8 && carry != 0 {
+        let limb = u512_get_limb(@acc, i);
+        let (new_limb, new_carry) = add_u64_with_carry(limb, 0, carry);
+        u512_set_limb(ref acc, i, new_limb);
+        carry = new_carry;
+        i += 1;
+    };
+    assert!(carry == 0, "u512 overflow");
     acc
 }
 
-fn u512_add_product(acc: U512, a: u64, b: u64, idx: u8) -> U512 {
+// Clean loop-based add-product
+fn u512_add_product(mut acc: U512, a: u64, b: u64, idx: u32) -> U512 {
     let prod: u128 = u128_from_u64(a) * u128_from_u64(b);
     let (low, high) = u128_split_to_u64(prod);
-    let mut acc = acc;
-    if idx == 0_u8 {
-        let (l0, c0) = add_u64_with_carry(acc.limb0, low, 0_u64);
-        acc.limb0 = l0;
-        let (l1, c1) = add_u64_with_carry(acc.limb1, high, c0);
-        acc.limb1 = l1;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 2_u8);
-        }
-        return acc;
+
+    // Add low part at idx
+    let limb_low = u512_get_limb(@acc, idx);
+    let (new_low, c0) = add_u64_with_carry(limb_low, low, 0);
+    u512_set_limb(ref acc, idx, new_low);
+
+    // Add high part at idx+1
+    let limb_high = u512_get_limb(@acc, idx + 1);
+    let (new_high, c1) = add_u64_with_carry(limb_high, high, c0);
+    u512_set_limb(ref acc, idx + 1, new_high);
+
+    // Propagate any remaining carry
+    if c1 != 0 {
+        acc = u512_add_one_from(acc, idx + 2);
     }
-    if idx == 1_u8 {
-        let (l1, c0) = add_u64_with_carry(acc.limb1, low, 0_u64);
-        acc.limb1 = l1;
-        let (l2, c1) = add_u64_with_carry(acc.limb2, high, c0);
-        acc.limb2 = l2;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 3_u8);
-        }
-        return acc;
-    }
-    if idx == 2_u8 {
-        let (l2, c0) = add_u64_with_carry(acc.limb2, low, 0_u64);
-        acc.limb2 = l2;
-        let (l3, c1) = add_u64_with_carry(acc.limb3, high, c0);
-        acc.limb3 = l3;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 4_u8);
-        }
-        return acc;
-    }
-    if idx == 3_u8 {
-        let (l3, c0) = add_u64_with_carry(acc.limb3, low, 0_u64);
-        acc.limb3 = l3;
-        let (l4, c1) = add_u64_with_carry(acc.limb4, high, c0);
-        acc.limb4 = l4;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 5_u8);
-        }
-        return acc;
-    }
-    if idx == 4_u8 {
-        let (l4, c0) = add_u64_with_carry(acc.limb4, low, 0_u64);
-        acc.limb4 = l4;
-        let (l5, c1) = add_u64_with_carry(acc.limb5, high, c0);
-        acc.limb5 = l5;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 6_u8);
-        }
-        return acc;
-    }
-    if idx == 5_u8 {
-        let (l5, c0) = add_u64_with_carry(acc.limb5, low, 0_u64);
-        acc.limb5 = l5;
-        let (l6, c1) = add_u64_with_carry(acc.limb6, high, c0);
-        acc.limb6 = l6;
-        if c1 == 1_u64 {
-            acc = u512_add_one_from(acc, 7_u8);
-        }
-        return acc;
-    }
-    if idx == 6_u8 {
-        let (l6, c0) = add_u64_with_carry(acc.limb6, low, 0_u64);
-        acc.limb6 = l6;
-        let (l7, c1) = add_u64_with_carry(acc.limb7, high, c0);
-        acc.limb7 = l7;
-        assert!(c1 == 0_u64, "u512 overflow");
-        return acc;
-    }
-    assert!(false, "u512 overflow");
     acc
 }
 
 fn u256_mul(a: U256, b: U256) -> U512 {
     let mut acc = u512_zero();
-    acc = u512_add_product(acc, a.limb0, b.limb0, 0_u8);
-    acc = u512_add_product(acc, a.limb0, b.limb1, 1_u8);
-    acc = u512_add_product(acc, a.limb0, b.limb2, 2_u8);
-    acc = u512_add_product(acc, a.limb0, b.limb3, 3_u8);
-
-    acc = u512_add_product(acc, a.limb1, b.limb0, 1_u8);
-    acc = u512_add_product(acc, a.limb1, b.limb1, 2_u8);
-    acc = u512_add_product(acc, a.limb1, b.limb2, 3_u8);
-    acc = u512_add_product(acc, a.limb1, b.limb3, 4_u8);
-
-    acc = u512_add_product(acc, a.limb2, b.limb0, 2_u8);
-    acc = u512_add_product(acc, a.limb2, b.limb1, 3_u8);
-    acc = u512_add_product(acc, a.limb2, b.limb2, 4_u8);
-    acc = u512_add_product(acc, a.limb2, b.limb3, 5_u8);
-
-    acc = u512_add_product(acc, a.limb3, b.limb0, 3_u8);
-    acc = u512_add_product(acc, a.limb3, b.limb1, 4_u8);
-    acc = u512_add_product(acc, a.limb3, b.limb2, 5_u8);
-    acc = u512_add_product(acc, a.limb3, b.limb3, 6_u8);
+    let mut i: u32 = 0;
+    while i < 4 {
+        let mut j: u32 = 0;
+        while j < 4 {
+            acc = u512_add_product(acc, u256_get_limb(@a, i), u256_get_limb(@b, j), i + j);
+            j += 1;
+        };
+        i += 1;
+    };
     acc
 }
 
@@ -544,17 +329,24 @@ fn i256_is_zero(value: I256) -> bool {
 }
 
 fn i256_eq(a: I256, b: I256) -> bool {
-    a.neg == b.neg && u256_eq(a.mag, b.mag)
+    // Defensive normalization: treat mag=0 as neg=false (no negative zero)
+    let a_neg = a.neg && !u256_is_zero(a.mag);
+    let b_neg = b.neg && !u256_is_zero(b.mag);
+    a_neg == b_neg && u256_eq(a.mag, b.mag)
 }
 
 fn i256_cmp(a: I256, b: I256) -> i32 {
-    if a.neg != b.neg {
-        if a.neg {
+    // Defensive normalization: treat mag=0 as neg=false (no negative zero)
+    let a_neg = a.neg && !u256_is_zero(a.mag);
+    let b_neg = b.neg && !u256_is_zero(b.mag);
+
+    if a_neg != b_neg {
+        if a_neg {
             return -1_i32;
         }
         return 1_i32;
     }
-    if !a.neg {
+    if !a_neg {
         return u256_cmp(a.mag, b.mag);
     }
     0_i32 - u256_cmp(a.mag, b.mag)
@@ -576,79 +368,40 @@ fn u256_from_u128_shifted_128(value: u128) -> U256 {
 }
 
 fn i256_add_internal(a: I256, b: I256) -> I256 {
-    if a.neg == b.neg {
-        let (sum, overflow) = u256_add(a.mag, b.mag);
-        assert!(!overflow, "i256 add overflow");
-        if a.neg {
-            assert!(u256_cmp(sum, U256_MAX_NEG_MAG) <= 0_i32, "i256 add overflow");
-        } else {
-            assert!(u256_cmp(sum, U256_MAX_POS_MAG) <= 0_i32, "i256 add overflow");
-        }
-        return i256_new(sum, a.neg);
-    }
-
-    let cmp = u256_cmp(a.mag, b.mag);
-    if cmp == 0_i32 {
-        return I256_ZERO;
-    }
-    if cmp > 0_i32 {
-        let (diff, underflow) = u256_sub(a.mag, b.mag);
-        assert!(!underflow, "i256 add underflow");
-        return i256_new(diff, a.neg);
-    }
-    let (diff, underflow) = u256_sub(b.mag, a.mag);
-    assert!(!underflow, "i256 add underflow");
-    i256_new(diff, b.neg)
+    i256_checked_add(a, b).expect('i256 add overflow')
 }
 
 fn i256_sub_internal(a: I256, b: I256) -> I256 {
-    if b.neg {
-        if a.neg {
-            let cmp = u256_cmp(a.mag, b.mag);
-            if cmp == 0_i32 {
-                return I256_ZERO;
-            }
-            if cmp > 0_i32 {
-                let (diff, underflow) = u256_sub(a.mag, b.mag);
-                assert!(!underflow, "i256 sub underflow");
-                return i256_new(diff, true);
-            }
-            let (diff, underflow) = u256_sub(b.mag, a.mag);
-            assert!(!underflow, "i256 sub underflow");
-            return i256_new(diff, false);
-        }
-
-        let (sum, overflow) = u256_add(a.mag, b.mag);
-        assert!(!overflow, "i256 sub overflow");
-        assert!(u256_cmp(sum, U256_MAX_POS_MAG) <= 0_i32, "i256 sub overflow");
-        return i256_new(sum, false);
-    }
-
-    if a.neg {
-        let (sum, overflow) = u256_add(a.mag, b.mag);
-        assert!(!overflow, "i256 sub overflow");
-        assert!(u256_cmp(sum, U256_MAX_NEG_MAG) <= 0_i32, "i256 sub overflow");
-        return i256_new(sum, true);
-    }
-
-    let cmp = u256_cmp(a.mag, b.mag);
-    if cmp == 0_i32 {
-        return I256_ZERO;
-    }
-    if cmp > 0_i32 {
-        let (diff, underflow) = u256_sub(a.mag, b.mag);
-        assert!(!underflow, "i256 sub underflow");
-        return i256_new(diff, false);
-    }
-    let (diff, underflow) = u256_sub(b.mag, a.mag);
-    assert!(!underflow, "i256 sub underflow");
-    i256_new(diff, true)
+    i256_checked_sub(a, b).expect('i256 sub overflow')
 }
 
-/// Creates an SQ128x128 from a raw I256 value.
+/// Creates an SQ128x128 from a raw I256 value WITHOUT range validation.
 /// The raw value is normalized to ensure no negative zero.
-pub fn from_raw(raw: i256) -> SQ128x128 {
+///
+/// # Safety
+/// This function does NOT validate that the magnitude is in range.
+/// Passing an out-of-range magnitude may cause panics in arithmetic operations.
+/// Prefer `from_raw_checked` for untrusted input.
+pub fn from_raw_unchecked(raw: i256) -> SQ128x128 {
     SQ128x128 { raw: i256_normalize(raw) }
+}
+
+/// Creates an SQ128x128 from a raw I256 value with range validation.
+/// Returns None if the magnitude exceeds the valid range for the sign.
+/// This is the recommended constructor for untrusted input.
+pub fn from_raw_checked(raw: i256) -> Option<SQ128x128> {
+    let normalized = i256_normalize(raw);
+    // Validate range based on sign
+    if normalized.neg {
+        if u256_cmp(normalized.mag, U256_MAX_NEG_MAG) > 0_i32 {
+            return Option::None;
+        }
+    } else {
+        if u256_cmp(normalized.mag, U256_MAX_POS_MAG) > 0_i32 {
+            return Option::None;
+        }
+    }
+    Option::Some(SQ128x128 { raw: normalized })
 }
 
 /// Extracts the raw I256 value from an SQ128x128.
@@ -705,32 +458,7 @@ pub fn delta(a: SQ128x128, b: SQ128x128) -> SQ128x128 {
 }
 
 fn mul_internal(a: SQ128x128, b: SQ128x128, round_up: bool) -> SQ128x128 {
-    if i256_is_zero(a.raw) || i256_is_zero(b.raw) {
-        return ZERO;
-    }
-    let neg = a.raw.neg != b.raw.neg;
-    let product = u256_mul(a.raw.mag, b.raw.mag);
-    assert!(!u512_high_overflow(product), "mul overflow");
-    let mut mag = u512_shr_128(product);
-    let rem_nonzero = u512_remainder_nonzero(product);
-
-    if neg {
-        if !round_up && rem_nonzero {
-            let (inc, overflow) = u256_add_u64(mag, 1_u64);
-            assert!(!overflow, "mul overflow");
-            mag = inc;
-        }
-        assert!(u256_cmp(mag, U256_MAX_NEG_MAG) <= 0_i32, "mul overflow");
-        return SQ128x128 { raw: i256_new(mag, true) };
-    }
-
-    if round_up && rem_nonzero {
-        let (inc, overflow) = u256_add_u64(mag, 1_u64);
-        assert!(!overflow, "mul overflow");
-        mag = inc;
-    }
-    assert!(u256_cmp(mag, U256_MAX_POS_MAG) <= 0_i32, "mul overflow");
-    SQ128x128 { raw: i256_new(mag, false) }
+    checked_mul_internal(a, b, round_up).expect('mul overflow')
 }
 
 /// Multiplies two values, rounding toward negative infinity (floor).
@@ -955,6 +683,8 @@ pub impl SQ128x128Sub of Sub<SQ128x128> {
     }
 }
 
+/// Multiplication operator uses floor rounding (mul_down semantics).
+/// For ceiling rounding, use `mul_up(a, b)` explicitly.
 pub impl SQ128x128Mul of Mul<SQ128x128> {
     fn mul(lhs: SQ128x128, rhs: SQ128x128) -> SQ128x128 {
         mul_internal(lhs, rhs, false)
@@ -963,9 +693,18 @@ pub impl SQ128x128Mul of Mul<SQ128x128> {
 
 pub impl SQ128x128Neg of Neg<SQ128x128> {
     fn neg(a: SQ128x128) -> SQ128x128 {
-        // Flip the sign, normalize to handle zero case
-        SQ128x128 { raw: i256_new(a.raw.mag, !a.raw.neg) }
+        checked_neg(a).expect('neg overflow')
     }
+}
+
+/// Checked negation. Returns None if negating MIN (which would overflow).
+pub fn checked_neg(a: SQ128x128) -> Option<SQ128x128> {
+    // Negating MIN (-2^127) would produce +2^127 which exceeds MAX (2^127 - 2^-128)
+    if a.raw.neg && u256_eq(a.raw.mag, U256_MAX_NEG_MAG) {
+        return Option::None;
+    }
+    // Flip the sign, normalize to handle zero case
+    Option::Some(SQ128x128 { raw: i256_new(a.raw.mag, !a.raw.neg) })
 }
 
 pub impl SQ128x128Zero of core::num::traits::Zero<SQ128x128> {
@@ -1028,13 +767,15 @@ impl SQ128x128Display of core::fmt::Display<SQ128x128> {
 
 impl SQ128x128Hash<S, +HashStateTrait<S>, +Drop<S>> of Hash<SQ128x128, S> {
     fn update_state(state: S, value: SQ128x128) -> S {
-        // Hash the magnitude limbs and sign
+        // Hash the magnitude limbs
         let state = state.update(value.raw.mag.limb0.into());
         let state = state.update(value.raw.mag.limb1.into());
         let state = state.update(value.raw.mag.limb2.into());
         let state = state.update(value.raw.mag.limb3.into());
-        // For sign, add offset for negative values (like Ekubo)
-        if value.raw.neg {
+        // Defensive normalization: treat mag=0 as neg=false (no negative zero)
+        // This ensures hash(neg_zero) == hash(zero) for Eq/Hash consistency
+        let is_neg = value.raw.neg && !u256_is_zero(value.raw.mag);
+        if is_neg {
             state.update(1)
         } else {
             state.update(0)
@@ -1045,8 +786,9 @@ impl SQ128x128Hash<S, +HashStateTrait<S>, +Drop<S>> of Hash<SQ128x128, S> {
 #[cfg(test)]
 mod tests {
     use super::{
-        I256, MAX, MIN, NEG_ONE, ONE, ONE_ULP, SQ128x128, ZERO, add, delta, from_int, from_raw,
-        mul_down, mul_up, sub, checked_add, checked_sub, checked_mul_down, checked_mul_up,
+        I256, MAX, MIN, NEG_ONE, ONE, ONE_ULP, SQ128x128, ZERO, add, delta, from_int,
+        from_raw_unchecked, from_raw_checked, mul_down, mul_up, sub, checked_add, checked_sub,
+        checked_mul_down, checked_mul_up, checked_neg,
     };
     use core::num::traits::{Zero, One};
     use core::option::OptionTrait;
@@ -1148,8 +890,8 @@ mod tests {
 
     #[test]
     fn mul_rounding_positive_remainder() {
-        let a = from_raw(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, false));
-        let b = from_raw(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, false));
+        let a = from_raw_unchecked(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, false));
+        let b = from_raw_unchecked(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, false));
         let down = mul_down(a, b);
         let up = mul_up(a, b);
         assert!(down == ZERO, "mul_down truncates");
@@ -1160,11 +902,11 @@ mod tests {
 
     #[test]
     fn mul_rounding_negative_remainder() {
-        let a = from_raw(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, true));
-        let b = from_raw(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, false));
+        let a = from_raw_unchecked(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, true));
+        let b = from_raw_unchecked(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, false));
         let down = mul_down(a, b);
         let up = mul_up(a, b);
-        let expected_down = from_raw(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, true));
+        let expected_down = from_raw_unchecked(raw_from_limbs(1_u64, 0_u64, 0_u64, 0_u64, true));
         assert!(down == expected_down, "mul_down floors negative");
         assert!(up == ZERO, "mul_up ceilings negative");
         let diff = sub(up, down);
@@ -1210,7 +952,7 @@ mod tests {
     fn negative_zero_normalizes() {
         // Construct a "negative zero" raw value
         let neg_zero_raw = I256 { mag: super::U256_ZERO, neg: true };
-        let normalized = from_raw(neg_zero_raw);
+        let normalized = from_raw_unchecked(neg_zero_raw);
         assert!(normalized == ZERO, "negative zero becomes ZERO");
         assert!(!normalized.raw.neg, "sign is cleared for zero");
     }
@@ -1219,8 +961,8 @@ mod tests {
     #[test]
     fn mul_cross_limb_values() {
         // Values that exercise limb1/limb2 interactions
-        let a = from_raw(raw_from_limbs(0_u64, 1_u64, 1_u64, 0_u64, false)); // has limb1 and limb2
-        let b = from_raw(raw_from_limbs(0_u64, 0_u64, 1_u64, 0_u64, false)); // ONE
+        let a = from_raw_unchecked(raw_from_limbs(0_u64, 1_u64, 1_u64, 0_u64, false)); // has limb1 and limb2
+        let b = from_raw_unchecked(raw_from_limbs(0_u64, 0_u64, 1_u64, 0_u64, false)); // ONE
         let result = mul_down(a, b);
         assert!(result == a, "multiplying by ONE preserves value");
     }
@@ -1230,8 +972,8 @@ mod tests {
     fn mul_rounding_bounds() {
         // For any multiplication with remainder, mul_down <= mul_up
         // and the difference is at most ONE_ULP
-        let a = from_raw(raw_from_limbs(7_u64, 0_u64, 0_u64, 0_u64, false));
-        let b = from_raw(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, false));
+        let a = from_raw_unchecked(raw_from_limbs(7_u64, 0_u64, 0_u64, 0_u64, false));
+        let b = from_raw_unchecked(raw_from_limbs(3_u64, 0_u64, 0_u64, 0_u64, false));
         let down = mul_down(a, b);
         let up = mul_up(a, b);
         assert!(down <= up, "mul_down <= mul_up");
@@ -1349,5 +1091,73 @@ mod tests {
     fn checked_mul_overflow_returns_none() {
         let result = checked_mul_down(MAX, MAX);
         assert!(result.is_none(), "checked_mul overflow returns None");
+    }
+
+    // 12. Negation overflow tests
+    #[test]
+    #[should_panic(expected: 'neg overflow')]
+    fn neg_min_overflows() {
+        // Negating MIN (-2^127) would produce +2^127 which exceeds MAX
+        let _ = -MIN;
+    }
+
+    #[test]
+    fn checked_neg_min_returns_none() {
+        let result = checked_neg(MIN);
+        assert!(result.is_none(), "checked_neg(MIN) returns None");
+    }
+
+    #[test]
+    fn checked_neg_max_succeeds() {
+        let result = checked_neg(MAX);
+        assert!(result.is_some(), "checked_neg(MAX) succeeds");
+        // -MAX should be valid (magnitude 2^127-1 with neg=true)
+    }
+
+    // 13. from_raw_checked validation tests
+    #[test]
+    fn from_raw_checked_valid_values() {
+        // Valid positive
+        let valid_pos = from_raw_checked(super::I256_SCALE);
+        assert!(valid_pos.is_some(), "valid positive");
+
+        // Valid negative
+        let valid_neg = from_raw_checked(super::I256_NEG_SCALE);
+        assert!(valid_neg.is_some(), "valid negative");
+
+        // Zero
+        let zero = from_raw_checked(super::I256_ZERO);
+        assert!(zero.is_some(), "zero valid");
+    }
+
+    #[test]
+    fn from_raw_checked_out_of_range() {
+        // Positive value with MAX_NEG magnitude (2^255) is out of range
+        let out_of_range = I256 { mag: super::U256_MAX_NEG_MAG, neg: false };
+        let result = from_raw_checked(out_of_range);
+        assert!(result.is_none(), "positive 2^255 is out of range");
+    }
+
+    // 14. Hash/Eq consistency for negative zero
+    #[test]
+    fn negative_zero_eq_consistency() {
+        // Construct negative zero (invalid but possible via public fields)
+        let neg_zero = SQ128x128 { raw: I256 { mag: super::U256_ZERO, neg: true } };
+        let pos_zero = ZERO;
+
+        // Eq should treat them as equal (defensive normalization)
+        assert!(neg_zero == pos_zero, "negative zero equals positive zero");
+        assert!(pos_zero == neg_zero, "symmetric equality");
+    }
+
+    #[test]
+    fn negative_zero_cmp_consistency() {
+        let neg_zero = SQ128x128 { raw: I256 { mag: super::U256_ZERO, neg: true } };
+
+        // Comparison should treat negative zero as zero
+        assert!(!(neg_zero < ZERO), "neg_zero not less than zero");
+        assert!(!(neg_zero > ZERO), "neg_zero not greater than zero");
+        assert!(neg_zero <= ZERO, "neg_zero <= zero");
+        assert!(neg_zero >= ZERO, "neg_zero >= zero");
     }
 }
