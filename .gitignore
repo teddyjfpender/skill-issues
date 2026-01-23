@@ -1,2 +1,4 @@
-
+# Scarb/Cairo build artifacts
 .scarb-cache
+target/
+Scarb.lock

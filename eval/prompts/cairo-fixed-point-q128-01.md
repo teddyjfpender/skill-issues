@@ -3,135 +3,207 @@
 Task:
 - Implement a Q128.128 signed fixed-point number type in Cairo for deterministic on-chain arithmetic.
 
+## Related Skills
+- `cairo-numeric-types`: Invariant enforcement, checked/unchecked APIs, trait implementations
+- `cairo-operator-overloading`: Add, Sub, Mul, Neg trait implementations
+- `cairo-quirks`: Language-specific gotchas (no bit shifts, array indexing, etc.)
+- `cairo-testing`: Test attributes, assertions, panic testing
+
 ## Overview
 
-Q128.128 is a fixed-point representation where:
-- **128 integer bits** (signed, two's complement)
+Q128.128 is a binary fixed-point representation where:
+- **128 integer bits** (signed, using sign-magnitude representation)
 - **128 fractional bits**
-- Stored as a single `i256` raw value
-- Real value = `raw / 2^128`
+- Stored as an `I256` (sign-magnitude: `mag: U256`, `neg: bool`)
+- Real value = `raw.mag / 2^128` with sign from `raw.neg`
 - ULP (unit in last place) = `2^-128`
 
 This format is ideal for DeFi applications requiring exact arithmetic without floating-point non-determinism.
 
-## Type Definition
+## Type Definitions
 
-```
-struct SQ128x128 {
-    raw: i256  // signed 256-bit two's complement
+### Recommended Structure (Sign-Magnitude)
+
+```cairo
+#[derive(Copy, Drop, Serde, Debug)]
+pub struct U256 {
+    pub limb0: u64, pub limb1: u64, pub limb2: u64, pub limb3: u64,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+pub struct I256 {
+    pub mag: U256,
+    pub neg: bool,
+}
+
+#[derive(Copy, Drop, Serde, Debug)]
+pub struct SQ128x128 {
+    pub raw: I256,
 }
 ```
 
-The scaling factor `S = 2^128` means:
-- Top 128 bits = integer part (with sign)
-- Bottom 128 bits = fractional part
+### Critical Invariant: No Negative Zero
+
+Use a constructor function that enforces the invariant:
+
+```cairo
+fn i256_new(mag: U256, neg: bool) -> I256 {
+    I256 { mag, neg: neg && !u256_is_zero(mag) }
+}
+```
+
+ALL code that creates I256 values should use this constructor.
 
 ## Value Range
 
-For signed `raw ∈ [-2^255, 2^255 - 1]`:
-- **Minimum**: `-2^127` (when `raw = -2^255`)
-- **Maximum**: `2^127 - 2^-128` (when `raw = 2^255 - 1`)
+For the sign-magnitude representation:
+- **Minimum**: `-2^127` (mag = `0x8000...0000`, neg = true)
+- **Maximum**: `2^127 - 2^-128` (mag = `0x7FFF...FFFF`, neg = false)
+
+Note: The positive and negative ranges are asymmetric (MIN has no positive counterpart).
 
 ## Required Constants
 
-Implement these as associated constants or functions:
-- `ZERO`: raw = 0
-- `ONE`: raw = 2^128
-- `NEG_ONE`: raw = -2^128
-- `MIN`: raw = -2^255 (minimum representable value)
-- `MAX`: raw = 2^255 - 1 (maximum representable value)
+```cairo
+pub const ZERO: SQ128x128     // raw.mag = 0, raw.neg = false
+pub const ONE: SQ128x128      // raw.mag = 2^128, raw.neg = false
+pub const NEG_ONE: SQ128x128  // raw.mag = 2^128, raw.neg = true
+pub const MIN: SQ128x128      // raw.mag = 2^255, raw.neg = true (minimum)
+pub const MAX: SQ128x128      // raw.mag = 2^255 - 1, raw.neg = false (maximum)
+pub const ONE_ULP: SQ128x128  // raw.mag = 1, raw.neg = false (smallest positive)
+```
 
 ## Required Operations
 
 ### Construction & Conversion
-- `from_raw(raw: i256) -> SQ128x128` - wrap raw value
-- `to_raw(self) -> i256` - extract raw value
-- `from_int(n: i128) -> SQ128x128` - convert integer (raw = n * 2^128), overflow-checked
 
-### Comparison
-- Implement `PartialEq` and `PartialOrd` based on raw value comparison
+- `from_raw_unchecked(raw: I256) -> SQ128x128` - wrap with normalization, no range check
+- `from_raw_checked(raw: I256) -> Option<SQ128x128>` - validate range, return None if invalid
+- `to_raw(value: SQ128x128) -> I256` - extract raw value
+- `from_int(n: i128) -> SQ128x128` - convert integer (raw.mag = |n| * 2^128), overflow-checked
 
-### Addition & Subtraction (Exact)
-- `add(a, b) -> SQ128x128` - exact addition with overflow check
-- `sub(a, b) -> SQ128x128` - exact subtraction with overflow check
+**API Safety**: Name unchecked functions explicitly (`_unchecked` suffix) to prevent misuse.
 
-Overflow conditions:
-- Addition: same signs but result has different sign
-- Subtraction: different signs but result sign doesn't match minuend
+### Comparison (with Defensive Normalization)
 
-### Delta (Signed Difference)
-- `delta(a, b) -> SQ128x128` - returns `b - a`
-- Property: `a + delta(a, b) == b` (when no overflow)
+Implement `PartialEq` and `PartialOrd`. In the underlying comparison functions, defensively normalize to handle potential negative zero:
 
-### Multiplication (Core Challenge)
+```cairo
+fn i256_eq(a: I256, b: I256) -> bool {
+    let a_neg = a.neg && !u256_is_zero(a.mag);  // Defensive normalization
+    let b_neg = b.neg && !u256_is_zero(b.mag);
+    a_neg == b_neg && u256_eq(a.mag, b.mag)
+}
+```
+
+### Checked vs Panicking Arithmetic
+
+Implement checked versions first (return `Option<T>`), then panicking wrappers:
+
+```cairo
+fn i256_checked_add(a: I256, b: I256) -> Option<I256> { /* core logic */ }
+fn i256_add_internal(a: I256, b: I256) -> I256 {
+    i256_checked_add(a, b).expect('i256 add overflow')
+}
+```
+
+Public API:
+- `add(a, b)`, `sub(a, b)` - panic on overflow
+- `checked_add(a, b)`, `checked_sub(a, b)` - return Option
+- `delta(a, b)` - returns `b - a`
+
+### Negation (Handle MIN Overflow)
+
+Negating MIN produces a value outside the representable range:
+
+```cairo
+pub fn checked_neg(a: SQ128x128) -> Option<SQ128x128> {
+    if a.raw.neg && u256_eq(a.raw.mag, U256_MAX_NEG_MAG) {
+        return Option::None;  // Cannot negate MIN
+    }
+    Option::Some(SQ128x128 { raw: i256_new(a.raw.mag, !a.raw.neg) })
+}
+```
+
+### Multiplication (512-bit Precision)
 
 Multiplication requires 512-bit intermediate precision:
+
 ```
-exact_product = (a.raw * b.raw) / 2^128
+exact_product_mag = (a.raw.mag * b.raw.mag) / 2^128
+result_neg = a.raw.neg != b.raw.neg
 ```
 
-Since `a.raw * b.raw` produces a 512-bit result, you must:
-1. Compute the full 512-bit signed product
-2. Divide by 2^128 (shift right by 128 bits)
-3. Apply rounding
-4. Check result fits in i256
+Steps:
+1. Compute full 512-bit unsigned product of magnitudes
+2. Check for overflow in upper bits (limbs 6-7 must be zero after shift)
+3. Shift right by 128 bits (extract limbs 2-5 as result magnitude)
+4. Apply rounding based on remainder (lower 128 bits)
+5. Validate result magnitude is in range
 
 Implement two rounding modes:
-- `mul_down(a, b)` - round toward -∞ (floor)
-- `mul_up(a, b)` - round toward +∞ (ceiling)
+- `mul_down(a, b)` - round toward -infinity (floor)
+- `mul_up(a, b)` - round toward +infinity (ceiling)
 
-Rounding rules for `mul_down`:
-- If product ≥ 0: `raw_out = product >> 128` (truncate)
-- If product < 0 and remainder ≠ 0: `raw_out = (product >> 128) - 1`
-- If product < 0 and remainder = 0: `raw_out = product >> 128`
+**Floor rounding rules**:
+- Positive result: truncate
+- Negative result with remainder: add 1 to magnitude (more negative)
 
-Rounding rules for `mul_up`:
-- If product ≥ 0 and remainder ≠ 0: `raw_out = (product >> 128) + 1`
-- If product ≥ 0 and remainder = 0: `raw_out = product >> 128`
-- If product < 0: `raw_out = product >> 128` (truncate toward zero, which is ceiling for negatives)
+**Ceiling rounding rules**:
+- Positive result with remainder: add 1 to magnitude
+- Negative result: truncate
 
-**Critical multiplication identities** (must hold):
-- `mul_*(x, ONE) == x` for any x
-- `mul_*(x, ZERO) == ZERO` for any x
-- `mul_down(a, b) <= exact(a * b) <= mul_up(a, b)`
-- `mul_up(a, b).raw - mul_down(a, b).raw ∈ {0, 1}`
+## Standard Trait Implementations
 
-## 512-bit Arithmetic Hint
+Implement these traits for `SQ128x128`:
+- `PartialEq` - note: parameters are `@Self` (snapshots)
+- `PartialOrd` - implement `lt`, `le`, `gt`, `ge`
+- `Add`, `Sub`, `Mul` - panic on overflow
+- `Neg` - panic if negating MIN
+- `Zero`, `One` - from `core::num::traits`
+- `Default` - return ZERO
+- `Hash` - must normalize before hashing for consistency with Eq
+- `Into<i128, SQ128x128>`, `Into<u128, SQ128x128>` - conversions
 
-Cairo doesn't have native 512-bit integers. Implement using limb arithmetic:
-- Represent 256-bit as 4 × 64-bit limbs (or 2 × 128-bit)
-- 256×256 multiplication produces 8 × 64-bit limbs (512-bit result)
-- Implement signed multiplication via unsigned multiply + sign handling
+Document the `Mul` trait's rounding behavior (uses floor by default).
 
-## Error Handling
+## Cairo-Specific Implementation Notes
 
-All operations MUST be overflow-checked. On overflow:
-- Panic/revert (preferred for on-chain determinism)
-- Or return `Option<SQ128x128>` with `None` on overflow
+- **No bit shifts**: Use `value / TWO_POW_64` instead of `value >> 64`
+- **Limb helpers**: Create `u512_get_limb`/`u512_set_limb` functions instead of copy-pasting
+- **Loop-based operations**: Prefer loops over unrolled branches to reduce code size
+- **Array indexing**: Use `.span().at(i)` for runtime index access
 
 ## Required Tests
 
-### Constant Tests
-- Verify ZERO, ONE, NEG_ONE, MIN, MAX have correct raw values
+### Core Functionality
+- Constants have correct raw values
+- `from_int` works for positive, negative, zero
+- `from_raw_checked` rejects out-of-range values
 
-### Addition/Subtraction Edge Cases
-- `MAX + one_ulp` overflows
-- `MIN - one_ulp` overflows
-- `MAX + NEG_MAX == ZERO`
+### Arithmetic Edge Cases
+- `MAX + ONE_ULP` overflows
+- `MIN - ONE_ULP` overflows
+- `MAX + (-MAX) == ZERO`
 - `MIN + MIN` overflows
 
-### Delta Tests
-- `delta(a, a) == ZERO`
-- `a + delta(a, b) == b` for various values
+### Negation
+- `checked_neg(MIN)` returns None
+- `checked_neg(MAX)` succeeds
+- `-(-x) == x` for valid values
 
-### Multiplication Tests
-- `ONE * ONE == ONE`
-- `ONE * x == x` for x ∈ {MIN, NEG_ONE, ZERO, ONE, MAX}
-- `NEG_ONE * NEG_ONE == ONE`
-- `NEG_ONE * ONE == NEG_ONE`
-- `MAX * ONE == MAX`
-- Test rounding: values where `a.raw * b.raw` has non-zero lower 128 bits
-- Test negative products with remainders
+### Multiplication Identities
+- `ONE * x == x` for x in {MIN, NEG_ONE, ZERO, ONE, MAX}
+- `NEG_ONE * x == -x` for valid values
+- `ZERO * x == ZERO`
+- Test rounding with values that produce non-zero remainders
+
+### Invariant Tests
+- Negative zero normalizes to positive zero
+- Hash is consistent with Eq for negative zero
+
+### Comparison
+- Ordering: MIN < NEG_ONE < ZERO < ONE < MAX
 
 ## Constraints
 

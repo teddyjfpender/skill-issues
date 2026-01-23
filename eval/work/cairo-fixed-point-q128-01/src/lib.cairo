@@ -396,12 +396,10 @@ pub fn from_raw_checked(raw: i256) -> Option<SQ128x128> {
         if u256_cmp(normalized.mag, U256_MAX_NEG_MAG) > 0_i32 {
             return Option::None;
         }
-    } else {
-        if u256_cmp(normalized.mag, U256_MAX_POS_MAG) > 0_i32 {
+    } else if u256_cmp(normalized.mag, U256_MAX_POS_MAG) > 0_i32  {
             return Option::None;
         }
-    }
-    Option::Some(SQ128x128 { raw: normalized })
+     Option::Some(SQ128x128 { raw: normalized })
 }
 
 /// Extracts the raw I256 value from an SQ128x128.
@@ -494,12 +492,10 @@ fn i256_checked_add(a: I256, b: I256) -> Option<I256> {
             if u256_cmp(sum, U256_MAX_NEG_MAG) > 0_i32 {
                 return Option::None;
             }
-        } else {
-            if u256_cmp(sum, U256_MAX_POS_MAG) > 0_i32 {
+        } else if u256_cmp(sum, U256_MAX_POS_MAG) > 0_i32  {
                 return Option::None;
             }
-        }
-        return Option::Some(i256_new(sum, a.neg));
+         return Option::Some(i256_new(sum, a.neg));
     }
 
     let cmp = u256_cmp(a.mag, b.mag);

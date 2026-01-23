@@ -2,154 +2,204 @@
 
 ## Build & Test Requirements
 
-Pass if:
+**Pass if:**
 - The file compiles with `scarb build`
 - All tests pass with `snforge test`
 
-Fail if:
+**Fail if:**
 - Code does not compile
 - Any test fails
 
-## Type Definition
+## Type Definition (10%)
 
-Pass if:
-- `SQ128x128` struct exists with an `i256` (or equivalent 256-bit signed) raw field
-- The type correctly represents Q128.128 fixed-point (128 integer + 128 fractional bits)
+**Pass if:**
+- `SQ128x128` struct exists with an `I256` raw field
+- `I256` uses sign-magnitude representation (`mag: U256`, `neg: bool`)
+- `U256` represented as 4 x 64-bit limbs (or equivalent)
+- Types have appropriate derives (`Copy`, `Drop`, `Serde`, `Debug`)
 
-Fail if:
-- Uses wrong bit width (e.g., u256 unsigned instead of signed, or wrong total bits)
+**Fail if:**
+- Uses wrong representation (e.g., two's complement without proper handling)
 - Missing raw field accessor
+- Types are not `Copy`
 
-## Constants
+## Invariant Enforcement (15%)
 
-Pass if:
-- `ZERO` has raw = 0
-- `ONE` has raw = 2^128
-- `NEG_ONE` has raw = -2^128
-- `MIN` has raw = -2^255
-- `MAX` has raw = 2^255 - 1
-- Constants are correctly typed as SQ128x128
+**Pass if:**
+- Has a constructor function (e.g., `i256_new`) that enforces no negative zero
+- Constructor normalizes: `neg: neg && !u256_is_zero(mag)`
+- ALL I256 creation goes through the constructor
+- Defensive normalization in `eq` and `cmp` functions
 
-Fail if:
-- Any constant has incorrect raw value
+**Fail if:**
+- Allows negative zero to exist
+- Creates I256 directly without normalization
+- `eq` or `cmp` could return inconsistent results for negative zero
+
+**Bonus:**
+- Normalize in `Hash` for consistency with `Eq`
+
+## API Safety (10%)
+
+**Pass if:**
+- `from_raw_unchecked` clearly named with `_unchecked` suffix
+- `from_raw_checked` provided, returns `Option<SQ128x128>`
+- `from_raw_checked` validates magnitude is in range for the sign
+- Documentation warns about safety requirements
+
+**Fail if:**
+- Unchecked function named just `from_raw` (misleading)
+- No checked alternative for untrusted input
+- Range validation missing or incorrect
+
+## Constants (5%)
+
+**Pass if:**
+- `ZERO` has mag = 0, neg = false
+- `ONE` has mag = 2^128, neg = false
+- `NEG_ONE` has mag = 2^128, neg = true
+- `MIN` has mag = 2^255, neg = true
+- `MAX` has mag = 2^255 - 1, neg = false
+- `ONE_ULP` has mag = 1, neg = false
+
+**Fail if:**
+- Any constant has incorrect value
 - Constants missing
 
-## Construction & Conversion
+## Arithmetic Operations (20%)
 
-Pass if:
-- `from_raw(i256) -> SQ128x128` correctly wraps value
-- `to_raw() -> i256` correctly extracts value
-- `from_int(i128) -> SQ128x128` correctly scales by 2^128 with overflow check
+### Addition & Subtraction
 
-Fail if:
-- Conversion loses precision
-- `from_int` doesn't overflow-check
+**Pass if:**
+- Results are mathematically exact
+- Overflow detection works for both same-sign and opposite-sign cases
+- Checked versions return `Option::None` on overflow
+- Panicking versions call checked with `.expect()`
 
-## Comparison
-
-Pass if:
-- Equality comparison works on raw values
-- Ordering comparison works correctly for signed values
-- Handles negative vs positive correctly
-
-Fail if:
-- Comparison treats raw as unsigned
-- Missing PartialEq or PartialOrd implementation
-
-## Addition & Subtraction
-
-Pass if:
-- Results are mathematically exact (no rounding)
-- Overflow detection works for signed arithmetic
-- `add(a, b)` where `a + b` exceeds MAX or goes below MIN triggers overflow
-- `sub(a, b)` with overflow triggers correctly
-
-Fail if:
+**Fail if:**
 - Arithmetic is incorrect
 - Missing overflow checks
-- Treats values as unsigned
+- Treats values as unsigned incorrectly
 
-## Delta Operation
+### Negation
 
-Pass if:
+**Pass if:**
+- `checked_neg(MIN)` returns `Option::None`
+- `checked_neg(MAX)` succeeds
+- `Neg` trait panics on MIN with clear error message
+- Uses `i256_new` constructor after flipping sign
+
+**Fail if:**
+- Negating MIN succeeds (should overflow)
+- Missing check for MIN value
+- Doesn't normalize after negation
+
+### Delta
+
+**Pass if:**
 - `delta(a, b)` returns `b - a`
-- `delta(a, a) == ZERO` for any a
-- `a + delta(a, b) == b` property holds (when no overflow)
+- `delta(a, a) == ZERO`
+- `a + delta(a, b) == b` property holds
 
-Fail if:
-- Delta computed incorrectly (e.g., a - b instead of b - a)
-- Missing or incorrect implementation
+**Fail if:**
+- Delta computed as `a - b` instead of `b - a`
 
-## Multiplication (Critical)
+## Multiplication (25%)
 
-Pass if:
-- Uses 512-bit intermediate precision for `a.raw * b.raw`
-- Correctly divides by 2^128 (shifts right by 128 bits)
-- `mul_down` implements floor rounding (toward -∞)
-- `mul_up` implements ceiling rounding (toward +∞)
-- `mul_*(x, ONE) == x` for all x
-- `mul_*(x, ZERO) == ZERO` for all x
-- `mul_down(a, b) <= exact <= mul_up(a, b)` (bounding property)
-- `mul_up.raw - mul_down.raw ∈ {0, 1}` (at most 1 ULP difference)
-- Overflow checked on final result
+**Pass if:**
+- Uses 512-bit intermediate precision for magnitude product
+- Correctly extracts 256-bit result after 128-bit shift
+- Overflow detection checks limbs 6-7 are zero (after accounting for shift)
+- `mul_down` implements floor rounding (toward -infinity)
+- `mul_up` implements ceiling rounding (toward +infinity)
+- Identity: `ONE * x == x` for all valid x
+- Identity: `ZERO * x == ZERO`
+- Sign handling: `neg_result = a.neg != b.neg`
+- Rounding: For negative results with remainder, `mul_down` adds 1 to magnitude
+- Rounding: For positive results with remainder, `mul_up` adds 1 to magnitude
+- Range validation on result magnitude
 
-Fail if:
-- Uses only 256-bit intermediate (loses precision, incorrect results)
-- Rounding is incorrect for negative products
+**Fail if:**
+- Uses only 256-bit intermediate (loses precision)
+- Rounding incorrect for negative products
 - Multiplication identities don't hold
 - Missing overflow check on result
-- Bounding property violated
+- Sign handling incorrect
 
-## 512-bit Arithmetic Implementation
+## Trait Implementations (10%)
 
-Pass if:
-- Correctly implements wide multiplication (256×256 → 512-bit)
-- Handles signed multiplication correctly (sign extension or abs+sign)
-- 128-bit right shift preserves sign for arithmetic shift
-- Remainder detection for rounding works correctly
+**Pass if:**
+- `PartialEq` implemented with `@Self` parameters (snapshots)
+- `PartialOrd` implements all four methods (`lt`, `le`, `gt`, `ge`)
+- `Add`, `Sub`, `Mul` traits implemented
+- `Neg` trait implemented with overflow check
+- `Zero` and `One` from `core::num::traits`
+- `Hash` normalizes input for consistency with `Eq`
+- `Mul` documentation states rounding behavior (floor)
 
-Fail if:
-- Truncates to 256-bit before division (loses precision)
-- Sign handling incorrect for negative operands
-- Shift doesn't preserve sign (logical vs arithmetic)
+**Fail if:**
+- `PartialEq` uses wrong parameter types (not snapshots)
+- Missing comparison methods
+- `Hash` inconsistent with `Eq` for negative zero
+- `Neg` doesn't handle MIN overflow
 
-## Test Coverage
+## Code Quality (5%)
 
-Pass if:
+**Pass if:**
+- Uses helper functions for limb access (reduces copy-paste)
+- Checked arithmetic as core, panicking as wrappers
+- Clear separation of concerns
+- Named constants for magic values (e.g., `TWO_POW_64`)
+- Uses `/ TWO_POW_64` not magic hex for bit extraction
+
+**Fail if:**
+- Massive copy-paste code for each limb
+- Panicking and checked logic duplicated
+- Magic numbers without constants
+- File is excessively large (>1500 lines for this scope)
+
+## Test Coverage (10%)
+
+**Pass if:**
 - Tests for all constants
 - Tests for add/sub overflow edge cases
-- Tests for delta properties
+- Tests for `checked_neg(MIN)` returning None
 - Tests for multiplication identities
 - Tests for rounding behavior (values with non-zero remainders)
-- Tests for negative × negative, negative × positive cases
+- Tests for negative zero normalization
+- Tests for comparison ordering
+- Tests for `from_raw_checked` rejecting out-of-range values
 
-Fail if:
-- Missing tests for overflow conditions
-- Missing tests for rounding correctness
+**Fail if:**
+- Missing tests for negation overflow
+- Missing tests for invariant (negative zero)
 - No negative number test cases
-
-## Code Quality
-
-Pass if:
-- Uses appropriate traits (Add, Sub, Mul, PartialEq, PartialOrd)
-- Clear separation of concerns
-- Deterministic behavior (no undefined behavior on any input)
-
-Fail if:
-- Undefined behavior possible
-- Non-deterministic (different results for same inputs)
+- No rounding tests
 
 ## Scoring Summary
 
-| Category | Weight | Pass Criteria |
-|----------|--------|---------------|
+| Category | Weight | Key Criteria |
+|----------|--------|--------------|
 | Compiles | Required | `scarb build` succeeds |
 | Tests Pass | Required | `snforge test` all pass |
-| Type Definition | 10% | Correct struct with i256 raw |
-| Constants | 10% | All 5 constants correct |
-| Add/Sub | 15% | Exact arithmetic, overflow checked |
-| Delta | 10% | Correct signed difference |
-| Multiplication | 35% | 512-bit precision, correct rounding |
-| Test Coverage | 20% | Edge cases covered |
+| Type Definition | 10% | Sign-magnitude I256, proper derives |
+| Invariant Enforcement | 15% | Constructor pattern, defensive normalization |
+| API Safety | 10% | Unchecked naming, checked alternative |
+| Constants | 5% | All 6 constants correct |
+| Arithmetic | 20% | Overflow checked, neg MIN handled |
+| Multiplication | 25% | 512-bit precision, correct rounding |
+| Traits | 10% | PartialEq/Ord, Neg overflow, Hash consistency |
+| Code Quality | 5% | Helpers, no duplication |
+| Test Coverage | 10% | Edge cases, invariants |
 
 **Minimum passing score**: All required + 70% weighted score
+
+## High-Severity Issues (Automatic Fail)
+
+These issues indicate fundamental correctness problems:
+
+1. **Neg overflow on MIN not handled**: Negating MIN must fail/return None
+2. **Negative zero allowed**: Must normalize to positive zero
+3. **Hash inconsistent with Eq**: Same values must hash the same
+4. **Multiplication without 512-bit precision**: Will produce incorrect results
+5. **from_raw allows arbitrary input without validation**: Security issue
