@@ -11,6 +11,15 @@ Source: https://book.cairo-lang.org/ch10-01-how-to-write-tests.html
 - `assert!`, `assert_eq!`, `assert_ne!`, `assert_lt!`, `assert_le!`, `assert_gt!`, `assert_ge!`.
 - Use `assert_macros = "2.8.2"` as a dev dependency to access the comparison macros.
 - Optional custom messages are passed like `assert!(cond, "message")`.
+- **Important**: The message argument must be a string literal, not a variable. This will NOT compile:
+  ```cairo
+  let msg = "error";
+  assert!(condition, msg);  // Error: Format string argument must be a string literal
+  ```
+  Instead, use a string literal directly:
+  ```cairo
+  assert!(condition, "error");  // Correct
+  ```
 
 ## Panic tests
 - `#[should_panic]` marks tests that must panic.

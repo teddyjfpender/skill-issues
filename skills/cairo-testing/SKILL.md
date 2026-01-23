@@ -16,6 +16,7 @@ Guide writing test functions, using assertion macros, and running tests with Sca
 ## Response Checklist
 - Add `#[test]` above each test function.
 - Use `assert!`, `assert_eq!`, `assert_ne!`, or comparison macros as needed.
+- Assert message arguments must be string literals, not variables (e.g., `assert!(x, "msg")` not `assert!(x, msg)`).
 - Use `#[should_panic(expected: "...")]` for panic-based tests.
 - Use `#[ignore]` for slow tests and `scarb test --include-ignored` when needed.
 - Add `#[available_gas(n)]` for recursion or long loops.
