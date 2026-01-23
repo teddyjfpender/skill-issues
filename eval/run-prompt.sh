@@ -6,7 +6,7 @@ usage() {
 Usage: eval/run-prompt.sh --prompt <id|path> [options]
 
 Options:
-  --skill <name>           Prefix prompt with $<skill-name>.
+  --skill <name>           Prefix prompt with $<skill-name>. Can be specified multiple times.
   --disable-skills         Disable skills via config override.
   --schema <path|default>  Enforce JSON output schema. Use "default" for eval/schema/code-output.schema.json.
   --model <name>           Override the model for this run.
@@ -22,7 +22,7 @@ USAGE
 }
 
 prompt_arg=""
-skill=""
+skills=()
 disable_skills=0
 schema_arg=""
 model=""
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --skill)
-      skill="$2"
+      skills+=("$2")
       shift 2
       ;;
     --disable-skills)
@@ -154,8 +154,11 @@ fi
 
 prompt_file="$results_dir/prompt.txt"
 {
-  if [[ -n "$skill" ]]; then
-    printf '$%s\n\n' "$skill"
+  if [[ ${#skills[@]} -gt 0 ]]; then
+    for s in "${skills[@]}"; do
+      printf '$%s\n' "$s"
+    done
+    printf '\n'
   fi
   if [[ -n "$schema_preamble" ]]; then
     printf '%s\n\n' "$schema_preamble"
@@ -194,7 +197,7 @@ end_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export RUN_PROMPT_ID="$prompt_id"
 export RUN_PROMPT_PATH="$prompt_path"
 export RUN_PROMPT_USED="$prompt_file"
-export RUN_SKILL="$skill"
+export RUN_SKILLS="${skills[*]}"
 export RUN_DISABLE_SKILLS="$disable_skills"
 export RUN_SCHEMA_PATH="$schema_path"
 export RUN_WORK_DIR="$work_dir"

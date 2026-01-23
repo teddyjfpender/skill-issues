@@ -64,6 +64,11 @@ Defaults:
 eval/run-prompt.sh --prompt cairo-generics-traits-01 --skill cairo-generics-traits --schema default
 ```
 
+With multiple skills:
+```bash
+eval/run-prompt.sh --prompt cairo-merge-k-sorted-lists-01 --skill cairo-arrays --skill cairo-generics-traits --schema default
+```
+
 Without skills:
 ```bash
 eval/run-prompt.sh --prompt cairo-generics-traits-01 --disable-skills --schema default

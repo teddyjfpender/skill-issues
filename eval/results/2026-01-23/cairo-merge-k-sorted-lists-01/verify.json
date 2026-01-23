@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "status": "fail",
+  "started_at": "2026-01-23T14:13:12Z",
+  "ended_at": "2026-01-23T14:13:12Z",
+  "duration_sec": 0,
+  "project_dir": "/Users/theodorepender/Coding/skill-issues/eval/work/cairo-merge-k-sorted-lists-01",
+  "counts": {
+    "pass": 1,
+    "fail": 1,
+    "skipped": 1
+  },
+  "failed_steps": [
+    "build"
+  ],
+  "steps": [
+    {
+      "cmd": "scarb fmt",
+      "duration_sec": 0,
+      "exit_code": 0,
+      "message": "",
+      "status": "pass",
+      "stderr_path": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/format.err",
+      "stdout_path": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/format.out",
+      "step": "format"
+    },
+    {
+      "cmd": "scarb build",
+      "duration_sec": 0,
+      "exit_code": 1,
+      "message": "",
+      "status": "fail",
+      "stderr_path": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/build.err",
+      "stdout_path": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/build.out",
+      "step": "build"
+    },
+    {
+      "cmd": "snforge test",
+      "duration_sec": 0,
+      "exit_code": 0,
+      "message": "no tests found",
+      "status": "skipped",
+      "stderr_path": "",
+      "stdout_path": "",
+      "step": "test"
+    }
+  ]
+}

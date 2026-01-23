@@ -17,7 +17,7 @@ payload = {
     "prompt_id": getenv("RUN_PROMPT_ID"),
     "prompt_path": getenv("RUN_PROMPT_PATH"),
     "prompt_used": getenv("RUN_PROMPT_USED"),
-    "skill": getenv("RUN_SKILL"),
+    "skills": [s for s in getenv("RUN_SKILLS").split() if s],
     "disable_skills": getenv("RUN_DISABLE_SKILLS") == "1",
     "schema_path": getenv("RUN_SCHEMA_PATH"),
     "work_dir": getenv("RUN_WORK_DIR"),

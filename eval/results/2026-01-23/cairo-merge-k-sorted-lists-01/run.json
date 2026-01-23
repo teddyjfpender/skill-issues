@@ -1,0 +1,23 @@
+{
+  "prompt_id": "cairo-merge-k-sorted-lists-01",
+  "prompt_path": "/Users/theodorepender/Coding/skill-issues/eval/prompts/cairo-merge-k-sorted-lists-01.md",
+  "prompt_used": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/prompt.txt",
+  "skills": [
+    "cairo-arrays",
+    "cairo-generics-traits",
+    "cairo-control-flow"
+  ],
+  "disable_skills": false,
+  "schema_path": "/Users/theodorepender/Coding/skill-issues/eval/schema/code-output.schema.json",
+  "work_dir": "/Users/theodorepender/Coding/skill-issues/eval/work/cairo-merge-k-sorted-lists-01",
+  "out_file": "/Users/theodorepender/Coding/skill-issues/eval/work/cairo-merge-k-sorted-lists-01/src/lib.cairo",
+  "results_dir": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01",
+  "model": "",
+  "codex_exit_code": 0,
+  "started_at": "2026-01-23T14:09:49Z",
+  "ended_at": "2026-01-23T14:13:12Z",
+  "codex_jsonl": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/codex.jsonl",
+  "codex_stderr": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/codex.stderr",
+  "last_message": "/Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/assistant_last.txt",
+  "codex_args": "exec - --output-last-message /Users/theodorepender/Coding/skill-issues/eval/results/2026-01-23/cairo-merge-k-sorted-lists-01/assistant_last.txt --json --output-schema /Users/theodorepender/Coding/skill-issues/eval/schema/code-output.schema.json"
+}
