@@ -22,3 +22,9 @@ Explain how to structure unit and integration tests in Cairo projects.
 - "Where do integration tests live in Cairo projects?"
 - "How do I share helpers across integration tests?"
 - "Can unit tests call private functions?"
+
+## Cairo by Example
+- [Testing](https://cairo-by-example.xyz/testing)
+- [Unit testing](https://cairo-by-example.xyz/testing/unit_testing)
+- [Integration testing](https://cairo-by-example.xyz/testing/integration_testing)
+- [Dev-dependencies](https://cairo-by-example.xyz/testing/dev_dependencies)

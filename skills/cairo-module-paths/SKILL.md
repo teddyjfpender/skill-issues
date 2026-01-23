@@ -22,3 +22,6 @@ Explain how to reference items using absolute and relative paths in the module t
 - "Why does `front_of_house::hosting::add_to_waitlist` fail?"
 - "When should I use `crate::` in a path?"
 - "How do I access a parent module item?"
+
+## Cairo by Example
+- [super and self](https://cairo-by-example.xyz/mod/super)

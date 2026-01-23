@@ -22,3 +22,6 @@ Guide `use` statements for ergonomic imports and re-exports.
 - "How do I shorten this long module path?"
 - "How do I import two items from the same module?"
 - "How do I re-export a module's function?"
+
+## Cairo by Example
+- [The use declaration](https://cairo-by-example.xyz/mod/use)

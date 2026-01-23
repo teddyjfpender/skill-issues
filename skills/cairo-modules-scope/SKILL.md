@@ -22,3 +22,8 @@ Guide module declarations, nesting, and visibility rules in Cairo.
 - "Why can't another module access my function?"
 - "Where should I put `mod hosting;`?"
 - "How do I make a module public?"
+
+## Cairo by Example
+- [Modules](https://cairo-by-example.xyz/mod)
+- [Visibility](https://cairo-by-example.xyz/mod/visibility)
+- [Struct visibility](https://cairo-by-example.xyz/mod/struct_visibility)

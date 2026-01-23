@@ -22,3 +22,10 @@ Guide closure syntax and how closures capture environment values in Cairo.
 - "How do I write a closure in Cairo?"
 - "Why is the closure type inferred as `u8`?"
 - "What is the difference between `FnOnce`, `FnMut`, and `Fn`?"
+
+## Cairo by Example
+- [Closures](https://cairo-by-example.xyz/fn/closures)
+- [Capturing](https://cairo-by-example.xyz/fn/closures/capture)
+- [As input parameters](https://cairo-by-example.xyz/fn/closures/input_parameters)
+- [Input functions](https://cairo-by-example.xyz/fn/closures/input_functions)
+- [Higher Order Functions](https://cairo-by-example.xyz/fn/hof)

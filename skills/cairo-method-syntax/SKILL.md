@@ -22,3 +22,6 @@ Guide method definitions using traits and impl blocks, with correct `self` forms
 - "How do I define a method on a Cairo struct?"
 - "What's the difference between `self`, `@self`, and `ref self`?"
 - "How do I write a constructor-like associated function?"
+
+## Cairo by Example
+- [Methods](https://cairo-by-example.xyz/fn/methods)

@@ -22,3 +22,11 @@ Explain Cairo conditional logic and loops with correct syntax and typing rules.
 - "Why can't I use an integer as an if condition in Cairo?"
 - "How do I return a value from a loop?"
 - "How do I write a for loop over a range?"
+
+## Cairo by Example
+- [Flow of Control](https://cairo-by-example.xyz/flow_control)
+- [if/else](https://cairo-by-example.xyz/flow_control/if_else)
+- [loop](https://cairo-by-example.xyz/flow_control/loop)
+- [while](https://cairo-by-example.xyz/flow_control/while)
+- [for and range](https://cairo-by-example.xyz/flow_control/for)
+- [Expressions](https://cairo-by-example.xyz/expression)

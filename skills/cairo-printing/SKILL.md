@@ -23,3 +23,10 @@ Guide printing for standard and custom types, including Display and Debug format
 - "How do I print a struct in Cairo?"
 - "What is the difference between Display and Debug?"
 - "How do I format a string without printing?"
+
+## Cairo by Example
+- [Hello World](https://cairo-by-example.xyz/hello)
+- [Formatted print](https://cairo-by-example.xyz/hello/print)
+- [Debug](https://cairo-by-example.xyz/hello/print/print_debug)
+- [Display](https://cairo-by-example.xyz/hello/print/print_display)
+- [Formatting](https://cairo-by-example.xyz/hello/print/fmt)

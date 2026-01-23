@@ -22,3 +22,10 @@ Guide Cairo's ownership rules, move semantics, and destruction traits so code co
 - "Why is this variable unavailable after I pass it to a function?"
 - "How do I make my struct Copy?"
 - "Why can't I derive Drop for a struct containing a dictionary?"
+
+## Cairo by Example
+- [Scoping rules](https://cairo-by-example.xyz/scope)
+- [RAII](https://cairo-by-example.xyz/scope/raii)
+- [Ownership and moves](https://cairo-by-example.xyz/scope/move)
+- [Mutability](https://cairo-by-example.xyz/scope/move/mut)
+- [Drop and Destruct](https://cairo-by-example.xyz/trait/drop)

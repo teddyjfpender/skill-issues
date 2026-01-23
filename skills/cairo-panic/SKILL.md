@@ -22,3 +22,8 @@ Explain how panics work in Cairo, how to trigger them, and how to constrain pani
 - "How do I panic with a short error code?"
 - "What does `nopanic` mean?"
 - "How do I create a wrapper that panics on `None`?"
+
+## Cairo by Example
+- [Error handling](https://cairo-by-example.xyz/error)
+- [panic](https://cairo-by-example.xyz/error/panic)
+- [panic! (core)](https://cairo-by-example.xyz/core/panic)

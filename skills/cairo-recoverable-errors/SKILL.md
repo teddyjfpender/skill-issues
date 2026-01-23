@@ -22,3 +22,13 @@ Show how to model recoverable failures with `Result<T, E>` and handle them safel
 - "How do I use `Result` in Cairo?"
 - "What is the difference between `unwrap` and `expect`?"
 - "How does the `?` operator work?"
+
+## Cairo by Example
+- [Option & unwrap](https://cairo-by-example.xyz/error/option_unwrap)
+- [Unpacking options with ?](https://cairo-by-example.xyz/error/option_unwrap/question_mark)
+- [Combinators: map](https://cairo-by-example.xyz/error/option_unwrap/map)
+- [Combinators: and_then](https://cairo-by-example.xyz/error/option_unwrap/and_then)
+- [Result](https://cairo-by-example.xyz/error/result)
+- [Introducing ?](https://cairo-by-example.xyz/error/result/enter_question_mark)
+- [Multiple error types](https://cairo-by-example.xyz/error/multiple_error_types)
+- [Core Result](https://cairo-by-example.xyz/core/result)

@@ -22,3 +22,8 @@ Guide users through Cairo function definitions, calls, return values, and const 
 - "How do I return a value from a Cairo function?"
 - "Can I call a function with named arguments?"
 - "What is a `const fn` in Cairo?"
+
+## Cairo by Example
+- [Functions](https://cairo-by-example.xyz/fn)
+- [Methods](https://cairo-by-example.xyz/fn/methods)
+- [Higher Order Functions](https://cairo-by-example.xyz/fn/hof)

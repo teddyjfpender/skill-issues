@@ -22,3 +22,7 @@ Use `if let` and `while let` for concise pattern matching when only one pattern 
 - "How do I unwrap Option::Some with if let?"
 - "How do I loop while pop_front returns Some?"
 - "When should I prefer match instead of if let?"
+
+## Cairo by Example
+- [if let](https://cairo-by-example.xyz/flow_control/if_let)
+- [while let](https://cairo-by-example.xyz/flow_control/while_let)

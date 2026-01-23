@@ -22,3 +22,11 @@ Guide how to define and implement traits in Cairo, including bounds and default 
 - "How do I implement a trait for a struct in Cairo?"
 - "Why can't I call a trait method even though impl exists?"
 - "Can a trait provide default method bodies?"
+
+## Cairo by Example
+- [Traits](https://cairo-by-example.xyz/trait)
+- [Derive](https://cairo-by-example.xyz/trait/derive)
+- [Drop and Destruct](https://cairo-by-example.xyz/trait/drop)
+- [Iterators](https://cairo-by-example.xyz/trait/iter)
+- [Clone](https://cairo-by-example.xyz/trait/clone)
+- [Disambiguating overlapping traits](https://cairo-by-example.xyz/trait/disambiguating)

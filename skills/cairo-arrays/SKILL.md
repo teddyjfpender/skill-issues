@@ -23,3 +23,6 @@ Explain Cairo Array semantics, method choices, and safe access patterns.
 - "Why can't I modify an element in a Cairo array?"
 - "When should I use `get` vs `at`?"
 - "How do I create an array literal?"
+
+## Cairo by Example
+- [Arrays and Slices](https://cairo-by-example.xyz/primitives/array)

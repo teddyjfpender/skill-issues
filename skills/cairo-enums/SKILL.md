@@ -22,3 +22,9 @@ Guide enum definitions, variant data, and common Option-based patterns in Cairo.
 - "How do I define an enum with data in Cairo?"
 - "What is `Option` and how do I use `Some`/`None`?"
 - "Why can't I access enum fields directly?"
+
+## Cairo by Example
+- [Enums](https://cairo-by-example.xyz/custom_types/enum)
+- [use](https://cairo-by-example.xyz/custom_types/enum/enum_use)
+- [Testcase: linked-list](https://cairo-by-example.xyz/custom_types/enum/testcase_linked_list)
+- [Option](https://cairo-by-example.xyz/core/option)

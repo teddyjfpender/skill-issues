@@ -22,3 +22,10 @@ Guide variable bindings in Cairo, including immutability, mutation with `mut`, c
 - "Why does `x = 6` fail after `let x = 5` in Cairo?"
 - "Should I use `mut` or shadowing when converting `u64` to `felt252`?"
 - "How do I declare a constant in Cairo?"
+
+## Cairo by Example
+- [Variable Bindings](https://cairo-by-example.xyz/variable_bindings)
+- [Mutability](https://cairo-by-example.xyz/variable_bindings/mut)
+- [Scope and Shadowing](https://cairo-by-example.xyz/variable_bindings/scope)
+- [Freezing](https://cairo-by-example.xyz/variable_bindings/freeze)
+- [Constants](https://cairo-by-example.xyz/custom_types/constants)

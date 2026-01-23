@@ -21,3 +21,8 @@ Guide refactoring patterns from separate variables to tuples to structs, and sho
 ## Example Requests
 - "Can you refactor these width/height variables into a struct?"
 - "How do I convert between two struct types in Cairo?"
+
+## Cairo by Example
+- [Structures](https://cairo-by-example.xyz/custom_types/structs)
+- [From and Into](https://cairo-by-example.xyz/conversion/into)
+- [TryFrom and TryInto](https://cairo-by-example.xyz/conversion/try_into)

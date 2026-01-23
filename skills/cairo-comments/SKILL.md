@@ -21,3 +21,7 @@ Provide correct Cairo comment syntax, including documentation comments for APIs 
 ## Example Requests
 - "How do I add documentation comments to a Cairo function?"
 - "Is there a module-level doc comment in Cairo?"
+
+## Cairo by Example
+- [Comments](https://cairo-by-example.xyz/hello/comment)
+- [Documentation](https://cairo-by-example.xyz/meta/doc)

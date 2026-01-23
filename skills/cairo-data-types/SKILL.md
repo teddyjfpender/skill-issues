@@ -22,3 +22,15 @@ Explain Cairo's core data types, literals, and conversions so answers stay type-
 - "What is the difference between `felt252` and `u64` in Cairo?"
 - "How do I write a short string vs a long string?"
 - "Why does this integer literal need a type annotation?"
+
+## Cairo by Example
+- [Primitives](https://cairo-by-example.xyz/primitives)
+- [Literals and operators](https://cairo-by-example.xyz/primitives/literals)
+- [Tuples](https://cairo-by-example.xyz/primitives/tuples)
+- [Types](https://cairo-by-example.xyz/types)
+- [Type Inference](https://cairo-by-example.xyz/types/inference)
+- [Aliasing](https://cairo-by-example.xyz/types/alias)
+- [Conversion](https://cairo-by-example.xyz/conversion)
+- [From and Into](https://cairo-by-example.xyz/conversion/into)
+- [TryFrom and TryInto](https://cairo-by-example.xyz/conversion/try_into)
+- [ByteArrays](https://cairo-by-example.xyz/core/bytearrays)

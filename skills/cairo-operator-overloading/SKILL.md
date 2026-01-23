@@ -21,3 +21,6 @@ Show how to overload operators by implementing the corresponding trait.
 ## Example Requests
 - "How do I implement `+` for a custom struct?"
 - "Can I overload operators in Cairo?"
+
+## Cairo by Example
+- [Operator Overloading](https://cairo-by-example.xyz/trait/ops)

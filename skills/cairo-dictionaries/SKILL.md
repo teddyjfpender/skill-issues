@@ -23,3 +23,6 @@ Guide correct creation and use of Cairo dictionaries with proper ownership and p
 - "How do I store balances by address in Cairo?"
 - "Why does `get` return a default value sometimes?"
 - "What is dictionary squashing and when does it happen?"
+
+## Cairo by Example
+- [Dictionaries](https://cairo-by-example.xyz/core/dict)

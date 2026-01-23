@@ -22,3 +22,9 @@ Explain how to use `match` for branching on enum values and destructuring data s
 - "How do I match on an Option in Cairo?"
 - "Why is my match non-exhaustive?"
 - "How do I extract the value from an enum variant?"
+
+## Cairo by Example
+- [match](https://cairo-by-example.xyz/flow_control/match)
+- [Destructuring](https://cairo-by-example.xyz/flow_control/match/destructuring)
+- [Destructuring enums](https://cairo-by-example.xyz/flow_control/match/destructuring/destructure_enum)
+- [Destructuring structs](https://cairo-by-example.xyz/flow_control/match/destructuring/destructure_structures)

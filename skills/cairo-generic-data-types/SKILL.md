@@ -22,3 +22,8 @@ Explain how to declare and use generic types and functions in Cairo with correct
 - "How do I write a generic struct in Cairo?"
 - "Can I have multiple type parameters?"
 - "Why does the compiler need a type annotation for this generic?"
+
+## Cairo by Example
+- [Generics](https://cairo-by-example.xyz/generics)
+- [Functions](https://cairo-by-example.xyz/generics/gen_fn)
+- [Implementation](https://cairo-by-example.xyz/generics/impl)

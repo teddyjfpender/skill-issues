@@ -23,3 +23,8 @@ Explain when to pass by value, snapshot, or mutable reference, and how to read o
 - "Why does passing this array move ownership?"
 - "How do I modify a struct inside a function and keep it?"
 - "What does `@` mean in a type annotation?"
+
+## Cairo by Example
+- [Retaining Ownership](https://cairo-by-example.xyz/scope/retaining_ownership)
+- [Snapshots](https://cairo-by-example.xyz/scope/retaining_ownership/snapshots)
+- [References](https://cairo-by-example.xyz/scope/retaining_ownership/ref)

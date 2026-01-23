@@ -22,3 +22,6 @@ Explain how smart pointers manage memory safely, with a focus on `Box<T>`.
 - "How do I make a recursive enum compile?"
 - "When should I use Box in Cairo?"
 - "How do I access a boxed value?"
+
+## Cairo by Example
+- [Box and Memory Segments](https://cairo-by-example.xyz/core/box)

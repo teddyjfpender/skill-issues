@@ -30,3 +30,9 @@ Provide conceptual guidance on generics and traits, including when to use them a
 - "What do generics and traits buy me in Cairo?"
 - "How do trait bounds relate to generics?"
 - "My generic implementation won't compile"
+
+## Cairo by Example
+- [Generics](https://cairo-by-example.xyz/generics)
+- [Traits](https://cairo-by-example.xyz/generics/gen_trait)
+- [Bounds](https://cairo-by-example.xyz/generics/bounds)
+- [Multiple bounds](https://cairo-by-example.xyz/generics/multi_bounds)

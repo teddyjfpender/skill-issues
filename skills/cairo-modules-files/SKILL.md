@@ -22,3 +22,6 @@ Explain how module declarations map to files and folders in a Cairo package.
 - "Where should I put `mod hosting;`?"
 - "How do I split a module into multiple files?"
 - "Why doesn't `use` load my module?"
+
+## Cairo by Example
+- [File hierarchy](https://cairo-by-example.xyz/mod/split)

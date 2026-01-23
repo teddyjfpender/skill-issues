@@ -22,3 +22,8 @@ Guide struct definitions, instantiation patterns, and safe field updates.
 - "How do I define a struct with multiple fields in Cairo?"
 - "Why can't I mutate just one struct field without `mut`?"
 - "How does struct update syntax affect ownership?"
+
+## Cairo by Example
+- [Custom Types](https://cairo-by-example.xyz/custom_types)
+- [Structures](https://cairo-by-example.xyz/custom_types/structs)
+- [Struct visibility](https://cairo-by-example.xyz/mod/struct_visibility)

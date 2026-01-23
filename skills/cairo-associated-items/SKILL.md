@@ -22,3 +22,8 @@ Explain associated items declared in traits and defined in impls, especially ass
 - "What is an associated type in Cairo?"
 - "Why is Self::Result used in trait methods?"
 - "When should I use associated types instead of generics?"
+
+## Cairo by Example
+- [Associated items](https://cairo-by-example.xyz/generics/assoc_items)
+- [The Problem](https://cairo-by-example.xyz/generics/assoc_items/the_problem)
+- [Associated types](https://cairo-by-example.xyz/generics/assoc_items/types)

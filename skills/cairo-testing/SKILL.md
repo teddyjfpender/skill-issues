@@ -24,3 +24,11 @@ Guide writing test functions, using assertion macros, and running tests with Sca
 - "How do I write a basic test in Cairo?"
 - "How do I assert a panic message?"
 - "How do I run a single test?"
+
+## Cairo by Example
+- [Testing](https://cairo-by-example.xyz/testing)
+- [Unit testing](https://cairo-by-example.xyz/testing/unit_testing)
+- [Integration testing](https://cairo-by-example.xyz/testing/integration_testing)
+- [Dev-dependencies](https://cairo-by-example.xyz/testing/dev_dependencies)
+- [Scarb Tests](https://cairo-by-example.xyz/scarb/test)
+- [Attributes: cfg](https://cairo-by-example.xyz/attribute/cfg)
