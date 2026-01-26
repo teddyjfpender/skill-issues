@@ -5,22 +5,64 @@ Build the driver prompt for Cairo code generation.
 Assembles:
 - Original prompt requirements
 - Rubric criteria
+- Pre-loaded skill content (to avoid searching)
 - Previous attempt code and errors (if attempt > 1)
 - Attempt history summary
+- Performance-focused instructions
 
 Usage:
-  build-driver-prompt.py --prompt <path> --rubric <path> --history <path> --attempt <n> --output <path>
+  build-driver-prompt.py --prompt <path> --rubric <path> --history <path> --attempt <n> --output <path> [--skills skill1,skill2]
 """
 
 import argparse
 import json
 import os
 import sys
+from pathlib import Path
 
 
 def read_file(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
+
+def find_repo_root() -> Path:
+    """Find the repository root by looking for eval/ directory."""
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / "skills").is_dir():
+            return current
+        current = current.parent
+    return Path.cwd()
+
+
+def load_skill_content(skill_name: str, repo_root: Path) -> str:
+    """Load skill content from the skills directory."""
+    skill_dir = repo_root / "skills" / skill_name
+
+    if not skill_dir.exists():
+        return f"[Skill '{skill_name}' not found at {skill_dir}]"
+
+    parts = [f"### Skill: {skill_name}"]
+
+    # Load SKILL.md if present
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.exists():
+        content = read_file(str(skill_md))
+        parts.append(content.strip())
+
+    # Load key reference files (limit to avoid huge prompts)
+    refs_dir = skill_dir / "references"
+    if refs_dir.exists():
+        for ref_file in sorted(refs_dir.glob("*.md"))[:2]:  # Max 2 reference files
+            ref_content = read_file(str(ref_file))
+            # Truncate large reference files
+            if len(ref_content) > 3000:
+                ref_content = ref_content[:3000] + "\n[... truncated ...]"
+            parts.append(f"\n#### Reference: {ref_file.name}")
+            parts.append(ref_content.strip())
+
+    return "\n\n".join(parts)
 
 
 def truncate_lines(text: str, max_lines: int = 50) -> str:
@@ -83,13 +125,41 @@ def build_prompt(
     history: dict,
     attempt_num: int,
     max_attempts: int,
+    skills_content: str = "",
 ) -> str:
     """Build the complete driver prompt."""
     parts = []
 
-    # Header
+    # Header with performance guidance
     parts.append("# Cairo Code Generation Task")
     parts.append("")
+    parts.append("## IMPORTANT: Performance Guidelines")
+    parts.append("")
+    parts.append("You are in an iterative code generation loop. Your goal is to generate code QUICKLY.")
+    parts.append("")
+    parts.append("**DO:**")
+    parts.append("- Generate code immediately using the skills and context provided below")
+    parts.append("- Make your best attempt even if uncertain - you'll get feedback to iterate")
+    parts.append("- Focus on satisfying the requirements, not on exploring the codebase")
+    parts.append("")
+    parts.append("**DO NOT:**")
+    parts.append("- Search for skill files - they are pre-loaded below")
+    parts.append("- Extensively research existing code patterns")
+    parts.append("- Read more than 2-3 files for reference")
+    parts.append("- Aim for perfection on the first attempt")
+    parts.append("")
+    parts.append("The loop will provide error feedback if your code doesn't compile or tests fail.")
+    parts.append("Iterate quickly rather than researching extensively.")
+    parts.append("")
+
+    # Pre-loaded skills (fixes skill path confusion)
+    if skills_content:
+        parts.append("## Pre-loaded Skills Reference")
+        parts.append("")
+        parts.append("Use these skills as your primary reference. Do NOT search for skill files.")
+        parts.append("")
+        parts.append(skills_content)
+        parts.append("")
 
     # Original requirements
     parts.append("## Original Requirements")
@@ -199,6 +269,7 @@ def main():
     parser.add_argument("--attempt", type=int, required=True, help="Current attempt number")
     parser.add_argument("--max-attempts", type=int, default=5, help="Maximum attempts")
     parser.add_argument("--output", required=True, help="Output path for prompt")
+    parser.add_argument("--skills", default="", help="Comma-separated list of skill names to pre-load")
     args = parser.parse_args()
 
     # Load inputs
@@ -209,6 +280,16 @@ def main():
     if os.path.exists(args.history):
         history = json.loads(read_file(args.history))
 
+    # Load skill content
+    skills_content = ""
+    if args.skills:
+        repo_root = find_repo_root()
+        skill_names = [s.strip() for s in args.skills.split(",") if s.strip()]
+        skill_parts = []
+        for skill_name in skill_names:
+            skill_parts.append(load_skill_content(skill_name, repo_root))
+        skills_content = "\n\n---\n\n".join(skill_parts)
+
     # Build prompt
     prompt = build_prompt(
         prompt_content=prompt_content,
@@ -216,6 +297,7 @@ def main():
         history=history,
         attempt_num=args.attempt,
         max_attempts=args.max_attempts,
+        skills_content=skills_content,
     )
 
     # Write output

@@ -24,6 +24,19 @@ def read_file(path: str) -> str:
 
 # Common Cairo error patterns and their actionable hints
 CAIRO_ERROR_PATTERNS = [
+    # Snapshot dereference errors (VERY COMMON)
+    (
+        r'Expected: "([^"]+)", found: "@\1"',
+        lambda m: f"Snapshot dereference needed. Use `*self.field` instead of `self.field` when self is a snapshot (@Type).",
+    ),
+    (
+        r'Unexpected argument type\. Expected: "core::integer::(\w+)", found: "@core::integer::\1"',
+        lambda m: f"Snapshot field needs dereferencing. When `self: @T`, use `*self.field` to get owned {m.group(1)} from @{m.group(1)}.",
+    ),
+    (
+        r'Unexpected argument type\. Expected: "(\w+)", found: "@\1"',
+        lambda m: f"Dereference snapshot field with `*`. Expected {m.group(1)} but got @{m.group(1)}.",
+    ),
     # Type mismatch errors
     (
         r"type mismatch: `([^`]+)` and `([^`]+)`",

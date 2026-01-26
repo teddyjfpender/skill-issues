@@ -1,9 +1,10 @@
 # Feature Improvement: Cairo Snapshot Dereferencing Guidance
 
 **ID**: 004
-**Status**: Open
+**Status**: Fixed
 **Priority**: High
 **Created**: 2026-01-26
+**Fixed**: 2026-01-26
 
 ## Problem
 
@@ -83,7 +84,34 @@ Example: Use *self.rows instead of self.rows
 
 Implement Option A immediately (quick fix) and Option C for better iteration feedback.
 
+## Fix Applied
+
+### Option A: Added to cairo-quirks Skill
+
+Added comprehensive "Snapshot Field Access (CRITICAL)" section to:
+- `skills/cairo-quirks/references/quirks.md` - Full documentation with examples
+- `skills/cairo-quirks/SKILL.md` - Quick reference in checklist
+
+### Option C: Enhanced Feedback Extraction
+
+Added snapshot-specific error patterns to `extract-feedback.py`:
+
+```python
+# Snapshot dereference errors (VERY COMMON)
+(
+    r'Expected: "([^"]+)", found: "@\1"',
+    lambda m: f"Snapshot dereference needed. Use `*self.field` instead of `self.field`...",
+),
+(
+    r'Unexpected argument type\. Expected: "core::integer::(\w+)", found: "@core::integer::\1"',
+    lambda m: f"Snapshot field needs dereferencing. When `self: @T`, use `*self.field`...",
+),
+```
+
+Now when the driver sees `Expected u32, found @u32` errors, the feedback will specifically suggest using `*self.field`.
+
 ## Related Files
 
-- `skills/cairo-quirks/references/quirks.md`
-- `eval/ralph/extract-feedback.py`
+- `skills/cairo-quirks/references/quirks.md` - added snapshot section
+- `skills/cairo-quirks/SKILL.md` - added to checklist
+- `eval/ralph/extract-feedback.py` - added error patterns

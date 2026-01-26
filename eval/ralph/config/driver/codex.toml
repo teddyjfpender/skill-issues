@@ -1,0 +1,19 @@
+# Codex configuration for the Driver agent
+# The driver generates Cairo code based on prompts and feedback
+
+[model]
+# Model is specified via CLI --driver-model flag
+# default = "o3"
+
+[features]
+# Driver should focus on code generation, not web search
+web_search_request = false
+# Auto-context helps understand the codebase
+auto_context = true
+
+[output]
+# Driver outputs structured JSON with code
+format = "json"
+
+# Note: Skills are pre-loaded into the prompt by build-driver-prompt.py
+# so we don't need to configure skills.additional_paths here

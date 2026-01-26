@@ -1,0 +1,19 @@
+# Codex configuration for the Reviewer agent
+# The reviewer validates generated code against the rubric
+
+[model]
+# Model is specified via CLI --reviewer-model flag
+# default = "o3"
+
+[features]
+# Reviewer doesn't need web search
+web_search_request = false
+# Reviewer gets all context in the prompt, no need to explore
+auto_context = false
+
+[output]
+# Reviewer outputs structured JSON with verdict and issues
+format = "json"
+
+# Note: Reviewer prompt includes the rubric and code,
+# so minimal additional context is needed

@@ -1,9 +1,10 @@
 # Feature Improvement: Driver Performance
 
 **ID**: 001
-**Status**: Open
+**Status**: Fixed
 **Priority**: High
 **Created**: 2026-01-26
+**Fixed**: 2026-01-26
 
 ## Problem
 
@@ -61,6 +62,33 @@ IMPORTANT: Your primary goal is to generate code, not research.
 - Total attempt time under 2 minutes
 - Code quality remains comparable
 
+## Fix Applied
+
+Updated `build-driver-prompt.py` to add explicit performance guidance at the top of the prompt:
+
+```
+## IMPORTANT: Performance Guidelines
+
+You are in an iterative code generation loop. Your goal is to generate code QUICKLY.
+
+**DO:**
+- Generate code immediately using the skills and context provided below
+- Make your best attempt even if uncertain - you'll get feedback to iterate
+- Focus on satisfying the requirements, not on exploring the codebase
+
+**DO NOT:**
+- Search for skill files - they are pre-loaded below
+- Extensively research existing code patterns
+- Read more than 2-3 files for reference
+- Aim for perfection on the first attempt
+```
+
+This emphasizes the iterative nature of the loop and discourages extensive research.
+
+## Related Files
+
+- `eval/ralph/build-driver-prompt.py`
+
 ## Related Issues
 
-- Reviewer JSON schema requires all properties in `required` array (fixed separately)
+- 003 (Skill Path Confusion) - also fixed by pre-loading skills

@@ -1,9 +1,10 @@
 # Feature Improvement: Driver Skill Path Confusion
 
 **ID**: 003
-**Status**: Open
+**Status**: Fixed
 **Priority**: Medium
 **Created**: 2026-01-26
+**Fixed**: 2026-01-26
 
 ## Problem
 
@@ -54,6 +55,35 @@ Create a skills index that driver can read first:
 ## Recommendation
 
 Option B (pre-load skills) is likely most effective for reducing iteration time, though it increases prompt token usage. Consider a hybrid: pre-load core skill content, provide index for additional reference files.
+
+## Fix Applied
+
+Implemented Option B: Pre-load skills into the prompt.
+
+1. Added `--skills` parameter to `build-driver-prompt.py`
+2. Added `load_skill_content()` function to read skill SKILL.md and reference files
+3. Updated `ralph-loop.sh` to pass `--skills "$driver_skills"` to the prompt builder
+4. Skill content is now embedded in the prompt under "## Pre-loaded Skills Reference"
+
+Example prompt section:
+```
+## Pre-loaded Skills Reference
+
+Use these skills as your primary reference. Do NOT search for skill files.
+
+### Skill: cairo-quirks
+[skill content here]
+
+---
+
+### Skill: cairo-generics-traits
+[skill content here]
+```
+
+## Related Files
+
+- `eval/ralph/build-driver-prompt.py` - added skill loading
+- `eval/ralph/ralph-loop.sh` - passes skills to prompt builder
 
 ## Related Issues
 

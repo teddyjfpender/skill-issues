@@ -42,6 +42,11 @@ Cairo has Rust-like syntax but differs in important ways. This skill documents c
 - **Tests need `#[test]` attribute**: Don't forget the attribute above test functions.
 - **`#[available_gas(n)]`**: Required for loops/recursion in tests.
 
+### Memory and Ownership (CRITICAL)
+- **Snapshot field access**: When `self: @T`, all fields become `@Field`. Use `*self.field` to dereference.
+- **Common error**: `Expected u32, found @u32` means you need to dereference with `*`.
+- **Pattern**: `if row >= *self.rows` not `if row >= self.rows`.
+
 ## Example Requests
 - "Why does my bit shift not compile in Cairo?"
 - "Why can't I index my array with a variable?"

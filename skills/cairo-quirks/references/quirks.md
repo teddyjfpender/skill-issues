@@ -315,6 +315,66 @@ pub fn my_function() -> u64 {
 
 ## Memory and Ownership
 
+### Snapshot Field Access (CRITICAL)
+
+**This is one of the most common Cairo errors.** When a method takes `self: @T` (snapshot), ALL struct fields become snapshots too. You must dereference them with `*` to use them as owned values.
+
+```cairo
+#[derive(Drop)]
+struct Matrix {
+    rows: u32,
+    cols: u32,
+    data: Array<u32>,
+}
+
+// WRONG - self.rows is @u32, not u32
+fn get_size(self: @Matrix) -> u32 {
+    self.rows * self.cols  // Error: Expected u32, found @u32
+}
+
+// CORRECT - dereference with *
+fn get_size(self: @Matrix) -> u32 {
+    *self.rows * *self.cols  // Works!
+}
+```
+
+**Common patterns that require dereferencing:**
+
+```cairo
+trait MatrixTrait {
+    fn get(self: @Matrix, row: u32, col: u32) -> Option<u32>;
+}
+
+impl MatrixImpl of MatrixTrait {
+    fn get(self: @Matrix, row: u32, col: u32) -> Option<u32> {
+        // WRONG - comparing u32 with @u32
+        if row >= self.rows { return None; }
+
+        // CORRECT - dereference self.rows
+        if row >= *self.rows { return None; }
+
+        // WRONG - passing @u32 where u32 expected
+        let idx = row * self.cols + col;
+
+        // CORRECT - dereference self.cols
+        let idx = row * *self.cols + col;
+
+        // For arrays, index then dereference the element
+        Some(*self.data[idx])
+    }
+}
+```
+
+**When to dereference:**
+- Comparisons: `if row >= *self.rows`
+- Arithmetic: `row * *self.cols`
+- Function arguments expecting owned values
+- Returning owned values from snapshot fields
+
+**When NOT to dereference:**
+- Array indexing syntax handles it: `self.data[i]` returns `@T`, then `*self.data[i]` gives `T`
+- Passing to functions that expect snapshots
+
 ### Snapshots vs References
 
 Cairo uses snapshots (`@T`) for immutable borrows:

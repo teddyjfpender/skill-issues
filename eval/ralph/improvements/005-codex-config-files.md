@@ -1,9 +1,10 @@
 # Feature Improvement: Codex Configuration Files for Driver/Reviewer
 
 **ID**: 005
-**Status**: Open
+**Status**: Fixed
 **Priority**: High
 **Created**: 2026-01-26
+**Fixed**: 2026-01-26
 
 ## Problem
 
@@ -158,6 +159,50 @@ run_ai_command() {
 3. Update `ralph-loop.sh` to accept `--config-dir` flag
 4. Update Codex invocation to use config files
 5. Document configuration options in README
+
+## Fix Applied
+
+Implemented Option B (Inline Config Overrides) following the Isabelle harness pattern.
+
+### Changes to `ralph-loop.sh`
+
+1. Added `role` parameter to `run_backend()` function (9th parameter)
+2. Added role-specific config options:
+
+```bash
+# Driver: focus on code generation, no web search
+if [[ "$role" == "driver" ]]; then
+  args+=(-c "features.web_search_request=false")
+  args+=(-c "features.auto_context=true")
+elif [[ "$role" == "reviewer" ]]; then
+  args+=(-c "features.web_search_request=false")
+  args+=(-c "features.auto_context=false")
+fi
+
+# Add skills directory
+if [[ -d "$script_dir/../../skills" ]]; then
+  skills_dir="$(cd "$script_dir/../../skills" && pwd)"
+  args+=(-c "skills.additional_paths=[\"${skills_dir}\"]")
+fi
+```
+
+3. Updated both `run_backend` calls to pass the role:
+   - Driver call: `"driver"`
+   - Reviewer call: `"reviewer"`
+
+### Template Config Files Created
+
+Created `eval/ralph/config/` with template files for documentation:
+- `driver/codex.toml` - driver configuration reference
+- `reviewer/codex.toml` - reviewer configuration reference
+
+These serve as documentation; the actual config is applied via `-c` flags.
+
+## Related Files
+
+- `eval/ralph/ralph-loop.sh` - added config flags to run_backend
+- `eval/ralph/config/driver/codex.toml` - template
+- `eval/ralph/config/reviewer/codex.toml` - template
 
 ## Related Issues
 

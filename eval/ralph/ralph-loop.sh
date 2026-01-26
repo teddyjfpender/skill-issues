@@ -254,6 +254,7 @@ run_backend() {
   local output_file="$6"
   local jsonl_file="$7"
   local stderr_file="$8"
+  local role="${9:-driver}"  # driver or reviewer
 
   local args=()
 
@@ -265,6 +266,24 @@ run_backend() {
     fi
     if [[ -n "$model" ]]; then
       args+=(--model "$model")
+    fi
+
+    # Add role-specific config options
+    # Driver: focus on code generation, no web search
+    # Reviewer: minimal context, just validate
+    if [[ "$role" == "driver" ]]; then
+      args+=(-c "features.web_search_request=false")
+      args+=(-c "features.auto_context=true")
+    elif [[ "$role" == "reviewer" ]]; then
+      args+=(-c "features.web_search_request=false")
+      args+=(-c "features.auto_context=false")
+    fi
+
+    # Add skills directory if it exists
+    if [[ -d "$script_dir/../../skills" ]]; then
+      local skills_dir
+      skills_dir="$(cd "$script_dir/../../skills" && pwd)"
+      args+=(-c "skills.additional_paths=[\"${skills_dir}\"]")
     fi
 
     # Add skills as $skill-name prefixes to prompt
@@ -358,6 +377,7 @@ for attempt in $(seq 1 "$max_attempts"); do
     --history "$history_path" \
     --attempt "$attempt" \
     --max-attempts "$max_attempts" \
+    --skills "$driver_skills" \
     --output "$driver_prompt"
 
   log_driver "Generating code..."
@@ -367,7 +387,7 @@ for attempt in $(seq 1 "$max_attempts"); do
 
   set +e
   run_backend "$driver_backend" "$driver_model" "$driver_skills" "$code_schema" \
-    "$driver_prompt" "$driver_output" "$driver_jsonl" "$driver_stderr"
+    "$driver_prompt" "$driver_output" "$driver_jsonl" "$driver_stderr" "driver"
   driver_exit=$?
   set -e
 
@@ -407,7 +427,7 @@ for attempt in $(seq 1 "$max_attempts"); do
 
   set +e
   run_backend "$reviewer_backend" "$reviewer_model" "$reviewer_skills" "$review_schema" \
-    "$reviewer_prompt" "$reviewer_output" "$reviewer_jsonl" "$reviewer_stderr"
+    "$reviewer_prompt" "$reviewer_output" "$reviewer_jsonl" "$reviewer_stderr" "reviewer"
   reviewer_exit=$?
   set -e
 
