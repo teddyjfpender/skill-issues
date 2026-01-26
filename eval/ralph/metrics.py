@@ -16,8 +16,9 @@ Usage as module:
 
 Usage from command line:
     python3 metrics.py start --prompt-id <id> --rubric-id <id> --output <path> [options]
-    python3 metrics.py step --metrics-path <path> --step-num <n> --status <status> --duration <secs>
+    python3 metrics.py step --metrics-path <path> --step-num <n> --status <status> --duration <secs> [--lint-warnings N] [--lint-fixed N]
     python3 metrics.py iteration --metrics-path <path> --attempt-num <n> --status <status>
+    python3 metrics.py lint --metrics-path <path> --warnings-before <n> --warnings-after <n>
     python3 metrics.py end --metrics-path <path> --status <pass|fail|partial>
     python3 metrics.py summary --metrics-path <path>
 """
@@ -102,6 +103,11 @@ class Metrics:
             "errors_encountered": [],
             "step_details": [],
             "iteration_details": [],
+            "lint": {
+                "total_warnings": 0,
+                "warnings_fixed": 0,
+                "per_step": [],
+            },
         }
 
     def record_step(
@@ -110,6 +116,8 @@ class Metrics:
         status: str,
         duration: float,
         errors: Optional[List[str]] = None,
+        lint_warnings: int = 0,
+        lint_fixed: int = 0,
     ) -> None:
         """Record completion of a step.
 
@@ -118,6 +126,8 @@ class Metrics:
             status: Step status ('completed', 'failed', 'skipped')
             duration: Duration in seconds
             errors: Optional list of error messages
+            lint_warnings: Number of lint warnings detected
+            lint_fixed: Number of lint warnings fixed by --fix
         """
         errors = errors or []
 
@@ -127,9 +137,22 @@ class Metrics:
             "duration_seconds": duration,
             "timestamp": utc_now(),
             "errors": errors,
+            "lint_warnings": lint_warnings,
+            "lint_fixed": lint_fixed,
         }
 
         self._data["step_details"].append(step_record)
+
+        # Update lint totals
+        if lint_warnings > 0:
+            self._data["lint"]["total_warnings"] += lint_warnings
+            self._data["lint"]["warnings_fixed"] += lint_fixed
+            self._data["lint"]["per_step"].append({
+                "step": step_num,
+                "warnings_before_fix": lint_warnings,
+                "warnings_after_fix": lint_warnings - lint_fixed,
+                "warnings_fixed": lint_fixed,
+            })
 
         if status == "completed":
             self._data["steps_completed"] = max(
@@ -141,6 +164,23 @@ class Metrics:
             error_type = self._classify_error(error)
             if error_type not in self._data["errors_encountered"]:
                 self._data["errors_encountered"].append(error_type)
+
+    def record_lint(
+        self,
+        warnings_before: int,
+        warnings_after: int,
+    ) -> None:
+        """Record lint warnings for the current step.
+
+        Args:
+            warnings_before: Number of warnings before any fix
+            warnings_after: Number of warnings after fix (if fix was run)
+        """
+        warnings_fixed = warnings_before - warnings_after
+
+        # Update totals
+        self._data["lint"]["total_warnings"] += warnings_before
+        self._data["lint"]["warnings_fixed"] += warnings_fixed
 
     def record_iteration(
         self,
@@ -180,12 +220,16 @@ class Metrics:
         self,
         final_status: str,
         final_code_path: Optional[str] = None,
+        steps_completed: Optional[int] = None,
+        best_code_path: Optional[str] = None,
     ) -> None:
         """Finalize metrics after run completion.
 
         Args:
             final_status: Final status ('pass', 'fail', 'partial')
             final_code_path: Optional path to final generated code
+            steps_completed: Optional override for steps completed count (for partial runs)
+            best_code_path: Optional path to best code achieved (for failed runs)
         """
         end_dt = utc_now_dt()
         self._data["end_time"] = utc_now()
@@ -198,6 +242,13 @@ class Metrics:
 
         if final_code_path:
             self._data["final_code_path"] = final_code_path
+
+        # For partial/failed runs, track the best code achieved
+        if steps_completed is not None:
+            self._data["steps_completed"] = steps_completed
+
+        if best_code_path:
+            self._data["best_code_path"] = best_code_path
 
     def set_tokens_estimated(self, tokens: int) -> None:
         """Set the estimated token count for prompts.
@@ -262,6 +313,27 @@ class Metrics:
             lines.append("--- Errors Encountered ---")
             for err in errors:
                 lines.append(f"  - {err}")
+            lines.append("")
+
+        # Lint statistics
+        lint_data = data.get("lint", {})
+        total_warnings = lint_data.get("total_warnings", 0)
+        warnings_fixed = lint_data.get("warnings_fixed", 0)
+        if total_warnings > 0 or warnings_fixed > 0:
+            lines.append("--- Lint Statistics ---")
+            lines.append(f"Total Warnings: {total_warnings}")
+            lines.append(f"Warnings Fixed: {warnings_fixed}")
+            warnings_remaining = total_warnings - warnings_fixed
+            lines.append(f"Warnings Remaining: {warnings_remaining}")
+            per_step = lint_data.get("per_step", [])
+            if per_step:
+                lines.append("Per-step breakdown:")
+                for step_lint in per_step:
+                    step = step_lint.get("step", "?")
+                    before = step_lint.get("warnings_before_fix", 0)
+                    after = step_lint.get("warnings_after_fix", 0)
+                    fixed = step_lint.get("warnings_fixed", 0)
+                    lines.append(f"  Step {step}: {before} warnings ({fixed} fixed, {after} remaining)")
             lines.append("")
 
         lines.append("=" * 50)
@@ -372,11 +444,16 @@ def cmd_step(args):
         except json.JSONDecodeError:
             errors = [args.errors]
 
+    lint_warnings = args.lint_warnings if args.lint_warnings else 0
+    lint_fixed = args.lint_fixed if args.lint_fixed else 0
+
     m.record_step(
         step_num=args.step_num,
         status=args.status,
         duration=args.duration,
         errors=errors,
+        lint_warnings=lint_warnings,
+        lint_fixed=lint_fixed,
     )
     m.save_metrics(args.metrics_path)
     print(f"Recorded step {args.step_num}: {args.status}")
@@ -409,9 +486,23 @@ def cmd_end(args):
     m.end_run(
         final_status=args.status,
         final_code_path=args.final_code,
+        steps_completed=args.steps_completed,
+        best_code_path=args.best_code,
     )
     m.save_metrics(args.metrics_path)
     print(f"Finalized metrics with status: {args.status}")
+
+
+def cmd_lint(args):
+    """Handle 'lint' command."""
+    m = load_metrics(args.metrics_path)
+    m.record_lint(
+        warnings_before=args.warnings_before,
+        warnings_after=args.warnings_after,
+    )
+    m.save_metrics(args.metrics_path)
+    warnings_fixed = args.warnings_before - args.warnings_after
+    print(f"Recorded lint: {args.warnings_before} warnings, {warnings_fixed} fixed")
 
 
 def cmd_summary(args):
@@ -448,6 +539,8 @@ def main():
     p_step.add_argument("--status", required=True, choices=["completed", "failed", "skipped"])
     p_step.add_argument("--duration", type=float, required=True, help="Duration in seconds")
     p_step.add_argument("--errors", help="JSON array or single error string")
+    p_step.add_argument("--lint-warnings", type=int, help="Number of lint warnings detected")
+    p_step.add_argument("--lint-fixed", type=int, help="Number of lint warnings fixed by --fix")
     p_step.set_defaults(func=cmd_step)
 
     # iteration
@@ -464,7 +557,16 @@ def main():
     p_end.add_argument("--metrics-path", required=True, help="Path to metrics.json")
     p_end.add_argument("--status", required=True, choices=["pass", "fail", "partial"])
     p_end.add_argument("--final-code", help="Path to final generated code")
+    p_end.add_argument("--steps-completed", type=int, help="Override steps completed count (for partial runs)")
+    p_end.add_argument("--best-code", help="Path to best code achieved (for failed runs)")
     p_end.set_defaults(func=cmd_end)
+
+    # lint
+    p_lint = subparsers.add_parser("lint", help="Record lint warnings")
+    p_lint.add_argument("--metrics-path", required=True, help="Path to metrics.json")
+    p_lint.add_argument("--warnings-before", type=int, required=True, help="Number of warnings before fix")
+    p_lint.add_argument("--warnings-after", type=int, required=True, help="Number of warnings after fix")
+    p_lint.set_defaults(func=cmd_lint)
 
     # summary
     p_summary = subparsers.add_parser("summary", help="Print human-readable summary")

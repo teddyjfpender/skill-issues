@@ -23,6 +23,64 @@ Cairo has Rust-like syntax but differs in important ways. This skill documents c
 - **No runtime array indexing**: Can't do `arr[i]` with runtime `i` on `[T; N]`. Use `.span().get(i)`.
 - **Span for iteration**: Convert fixed-size arrays to Span before iteration with `.span()`.
 
+## Array Initialization and Usage
+
+**CRITICAL: Cairo arrays are append-only queues, NOT random-access mutable arrays.**
+
+### Initialization
+```cairo
+// CORRECT ways to create arrays:
+let arr: Array<u32> = array![];           // Empty array
+let arr: Array<u32> = array![1, 2, 3];    // With initial values
+let arr: Array<u32> = ArrayTrait::new();  // Alternative empty
+
+// WRONG - these do NOT exist in Cairo:
+let arr = ArrayDefault::default();  // NO
+let arr = Array::new();             // NO
+let arr = Vec::new();               // NO (Vec doesn't exist)
+```
+
+### Array Operations
+```cairo
+// Adding elements (append-only)
+arr.append(value);        // Add to end
+arr.append_span(span);    // Add multiple
+
+// Reading elements
+let val = *arr.at(index); // Get by index (returns snapshot, must dereference)
+let len = arr.len();      // Get length
+
+// Removing elements
+let val = arr.pop_front(); // Remove from front, returns Option<T>
+
+// WRONG - these do NOT exist:
+arr.set(index, value);    // NO random access write
+arr[index] = value;       // NO assignment by index
+arr.push(value);          // NO (use append)
+arr.pop();                // NO (use pop_front)
+```
+
+### Common Pattern: "Updating" Array Values
+Since Cairo arrays can't be modified in place, use these patterns:
+
+```cairo
+// Pattern 1: Rebuild array (simple but O(n))
+let mut new_arr: Array<u32> = array![];
+let mut i: u32 = 0;
+while i < arr.len() {
+    if i == target_index {
+        new_arr.append(new_value);
+    } else {
+        new_arr.append(*arr.at(i));
+    }
+    i += 1;
+};
+
+// Pattern 2: Pop and append (for queue-like usage)
+let _discarded = arr.pop_front().unwrap();
+arr.append(new_value);
+```
+
 ### Scope and Declarations
 - **No `use` in functions**: Import statements must be at module level, not inside functions.
 - **No variables named `type`**: Reserved keyword, even in lowercase.

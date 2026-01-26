@@ -1,6 +1,6 @@
-use core::array::ArrayTrait;
+use core::num::traits::{Zero, One};
 
-pub fn max(a: u32, b: u32) -> u32 {
+fn max(a: u32, b: u32) -> u32 {
     if a > b {
         a
     } else {
@@ -8,7 +8,7 @@ pub fn max(a: u32, b: u32) -> u32 {
     }
 }
 
-pub fn min(a: u32, b: u32) -> u32 {
+fn min(a: u32, b: u32) -> u32 {
     if a < b {
         a
     } else {
@@ -17,165 +17,140 @@ pub fn min(a: u32, b: u32) -> u32 {
 }
 
 pub fn trap_brute_force(height: @Array<u32>) -> u32 {
-    if height.len() <= 2 {
+    if height.len() == 0 {
         return 0;
     }
 
-    let mut total_water = 0;
-    let mut i = 1;
-
-    while i < height.len() - 1 {
-        // Find max height to the left
-        let mut left_max = 0;
-        let mut j = 0;
-        while j < i {
+    let mut total_water: u32 = 0;
+    let n = height.len();
+    
+    let mut i: u32 = 0;
+    while i < n {
+        let mut left_max: u32 = 0;
+        let mut j: u32 = 0;
+        while j <= i {
             left_max = max(left_max, *height.at(j));
             j += 1;
-        }
-
-        // Find max height to the right
-        let mut right_max = 0;
-        j = i + 1;
-        while j < height.len() {
-            right_max = max(right_max, *height.at(j));
-            j += 1;
-        }
-
-        // Calculate water at current position
-        let min_height = min(left_max, right_max);
+        };
+        
+        let mut right_max: u32 = 0;
+        let mut k: u32 = i;
+        while k < n {
+            right_max = max(right_max, *height.at(k));
+            k += 1;
+        };
+        
+        let water_level = min(left_max, right_max);
         let current_height = *height.at(i);
-        if min_height > current_height {
-            total_water += min_height - current_height;
+        if water_level > current_height {
+            total_water += water_level - current_height;
         }
-
+        
         i += 1;
-    }
-
+    };
+    
     total_water
 }
 
 pub fn trap_dp(height: @Array<u32>) -> u32 {
-    if height.len() <= 2 {
+    if height.len() == 0 {
         return 0;
     }
 
     let n = height.len();
-    let mut left_max: Array<u32> = ArrayTrait::new();
-    let mut right_max: Array<u32> = ArrayTrait::new();
-
-    // Build left_max array
-    left_max.append(*height.at(0));
-    let mut i = 1;
+    
+    let mut left_max: Array<u32> = array![];
+    let mut current_left_max: u32 = 0;
+    let mut i: u32 = 0;
     while i < n {
-        let prev_max = *left_max.at(i - 1);
-        let current_height = *height.at(i);
-        left_max.append(max(prev_max, current_height));
+        current_left_max = max(current_left_max, *height.at(i));
+        left_max.append(current_left_max);
         i += 1;
-    }
-
-    // Build right_max array - fill with zeros first
-    let mut j = 0;
+    };
+    
+    let mut right_max: Array<u32> = array![];
+    let mut j: u32 = 0;
     while j < n {
         right_max.append(0);
         j += 1;
-    }
-
-    // Set last element and fill backwards
-    let last_idx = n - 1;
-    right_max.append(*height.at(last_idx));
-    let _right_max_span = right_max.span();
-
-    // Create new array for actual right_max values
-    let mut final_right_max: Array<u32> = ArrayTrait::new();
-    j = 0;
-    while j < n {
-        final_right_max.append(0);
-        j += 1;
-    }
-
-    // Calculate right_max properly
-    let mut temp_right_max: Array<u32> = ArrayTrait::new();
-    temp_right_max.append(*height.at(last_idx));
-
-    let mut k = 1;
-    while k < n {
-        let idx = n - 1 - k;
-        let prev_max = *temp_right_max.at(k - 1);
+    };
+    
+    let mut current_right_max: u32 = 0;
+    let mut k: u32 = n;
+    while k > 0 {
+        k -= 1;
+        current_right_max = max(current_right_max, *height.at(k));
+        
+        let mut temp_array: Array<u32> = array![];
+        let mut m: u32 = 0;
+        while m < n {
+            if m == k {
+                temp_array.append(current_right_max);
+            } else {
+                temp_array.append(*right_max.at(m));
+            }
+            m += 1;
+        };
+        right_max = temp_array;
+    };
+    
+    let mut total_water: u32 = 0;
+    let mut idx: u32 = 0;
+    while idx < n {
+        let water_level = min(*left_max.at(idx), *right_max.at(idx));
         let current_height = *height.at(idx);
-        temp_right_max.append(max(prev_max, current_height));
-        k += 1;
-    }
-
-    // Reverse temp_right_max to get final_right_max
-    let mut final_right: Array<u32> = ArrayTrait::new();
-    let mut m = 0;
-    while m < n {
-        let reverse_idx = n - 1 - m;
-        final_right.append(*temp_right_max.at(reverse_idx));
-        m += 1;
-    }
-
-    // Calculate total water
-    let mut total_water = 0;
-    let mut p = 0;
-    while p < n {
-        let left_val = *left_max.at(p);
-        let right_val = *final_right.at(p);
-        let current_height = *height.at(p);
-        let water_level = min(left_val, right_val);
         if water_level > current_height {
             total_water += water_level - current_height;
         }
-        p += 1;
-    }
-
+        idx += 1;
+    };
+    
     total_water
 }
 
 pub fn trap(height: @Array<u32>) -> u32 {
-    if height.len() <= 2 {
+    if height.len() == 0 {
         return 0;
     }
 
-    let mut left = 0;
-    let mut right = height.len() - 1;
-    let mut left_max = 0;
-    let mut right_max = 0;
-    let mut total_water = 0;
+    let mut left: u32 = 0;
+    let mut right: u32 = height.len() - 1;
+    let mut left_max: u32 = 0;
+    let mut right_max: u32 = 0;
+    let mut total_water: u32 = 0;
 
     while left < right {
-        if *height.at(left) < *height.at(right) {
-            if *height.at(left) >= left_max {
-                left_max = *height.at(left);
+        let left_height = *height.at(left);
+        let right_height = *height.at(right);
+
+        if left_height < right_height {
+            if left_height >= left_max {
+                left_max = left_height;
             } else {
-                total_water += left_max - *height.at(left);
+                total_water += left_max - left_height;
             }
             left += 1;
         } else {
-            if *height.at(right) >= right_max {
-                right_max = *height.at(right);
+            if right_height >= right_max {
+                right_max = right_height;
             } else {
-                total_water += right_max - *height.at(right);
+                total_water += right_max - right_height;
             }
             right -= 1;
         }
-    }
+    };
 
     total_water
 }
 
-trait RainWaterTrait {
-    fn solve(height: @Array<u32>) -> u32;
+pub trait RainWaterTrait {
     fn brute_force(height: @Array<u32>) -> u32;
     fn dynamic_programming(height: @Array<u32>) -> u32;
-    fn two_pointers(height: @Array<u32>) -> u32;
+    fn two_pointer(height: @Array<u32>) -> u32;
+    fn solve(height: @Array<u32>) -> u32;
 }
 
-impl RainWaterImpl of RainWaterTrait {
-    fn solve(height: @Array<u32>) -> u32 {
-        trap(height)
-    }
-
+pub impl RainWaterImpl of RainWaterTrait {
     fn brute_force(height: @Array<u32>) -> u32 {
         trap_brute_force(height)
     }
@@ -184,143 +159,97 @@ impl RainWaterImpl of RainWaterTrait {
         trap_dp(height)
     }
 
-    fn two_pointers(height: @Array<u32>) -> u32 {
+    fn two_pointer(height: @Array<u32>) -> u32 {
+        trap(height)
+    }
+
+    fn solve(height: @Array<u32>) -> u32 {
         trap(height)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use core::array::ArrayTrait;
-    use super::{max, min, trap, trap_brute_force, trap_dp};
+    use super::{RainWaterTrait, RainWaterImpl};
 
     #[test]
-    fn test_helper_max() {
-        assert(max(3, 5) == 5, 'max(3,5) should be 5');
-        assert(max(7, 2) == 7, 'max(7,2) should be 7');
-        assert(max(4, 4) == 4, 'max(4,4) should be 4');
-    }
-
-    #[test]
-    fn test_helper_min() {
-        assert(min(3, 5) == 3, 'min(3,5) should be 3');
-        assert(min(7, 2) == 2, 'min(7,2) should be 2');
-        assert(min(4, 4) == 4, 'min(4,4) should be 4');
-    }
-
-    #[test]
-    fn test_example_1_two_pointer() {
-        // [0,1,0,2,1,0,1,3,2,1,2,1] -> 6
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(0);
-        height.append(1);
-        height.append(0);
-        height.append(2);
-        height.append(1);
-        height.append(0);
-        height.append(1);
-        height.append(3);
-        height.append(2);
-        height.append(1);
-        height.append(2);
-        height.append(1);
-        assert(trap(@height) == 6, 'Example 1 should be 6');
-    }
-
-    #[test]
-    fn test_example_1_brute_force() {
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(0);
-        height.append(1);
-        height.append(0);
-        height.append(2);
-        height.append(1);
-        height.append(0);
-        height.append(1);
-        height.append(3);
-        height.append(2);
-        height.append(1);
-        height.append(2);
-        height.append(1);
-        assert(trap_brute_force(@height) == 6, 'BF Example 1 should be 6');
+    fn test_example_1() {
+        let height = array![0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1];
+        assert!(RainWaterImpl::brute_force(@height) == 6, "brute_force ex1");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 6, "dp ex1");
+        assert!(RainWaterImpl::two_pointer(@height) == 6, "two_ptr ex1");
+        assert!(RainWaterImpl::solve(@height) == 6, "solve ex1");
     }
 
     #[test]
     fn test_example_2() {
-        // [4,2,0,3,2,5] -> 9
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(4);
-        height.append(2);
-        height.append(0);
-        height.append(3);
-        height.append(2);
-        height.append(5);
-        assert(trap(@height) == 9, 'Example 2 should be 9');
+        let height = array![4, 2, 0, 3, 2, 5];
+        assert!(RainWaterImpl::brute_force(@height) == 9, "brute_force ex2");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 9, "dp ex2");
+        assert!(RainWaterImpl::two_pointer(@height) == 9, "two_ptr ex2");
+        assert!(RainWaterImpl::solve(@height) == 9, "solve ex2");
     }
 
     #[test]
     fn test_empty_array() {
-        let height: Array<u32> = ArrayTrait::new();
-        assert(trap(@height) == 0, 'Empty should be 0');
+        let height = array![];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force empty");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp empty");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr empty");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve empty");
     }
 
     #[test]
     fn test_single_element() {
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(5);
-        assert(trap(@height) == 0, 'Single should be 0');
+        let height = array![5];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force single");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp single");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr single");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve single");
     }
 
     #[test]
     fn test_two_elements() {
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(5);
-        height.append(3);
-        assert(trap(@height) == 0, 'Two elements should be 0');
+        let height = array![3, 7];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force two");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp two");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr two");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve two");
     }
 
     #[test]
     fn test_flat_array() {
-        // [3,3,3,3] -> 0
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(3);
-        height.append(3);
-        height.append(3);
-        height.append(3);
-        assert(trap(@height) == 0, 'Flat should be 0');
+        let height = array![3, 3, 3, 3];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force flat");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp flat");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr flat");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve flat");
     }
 
     #[test]
     fn test_descending() {
-        // [5,4,3,2,1] -> 0
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(5);
-        height.append(4);
-        height.append(3);
-        height.append(2);
-        height.append(1);
-        assert(trap(@height) == 0, 'Descending should be 0');
+        let height = array![5, 4, 3, 2, 1];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force desc");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp desc");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr desc");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve desc");
     }
 
     #[test]
     fn test_ascending() {
-        // [1,2,3,4,5] -> 0
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(1);
-        height.append(2);
-        height.append(3);
-        height.append(4);
-        height.append(5);
-        assert(trap(@height) == 0, 'Ascending should be 0');
+        let height = array![1, 2, 3, 4, 5];
+        assert!(RainWaterImpl::brute_force(@height) == 0, "brute_force asc");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 0, "dp asc");
+        assert!(RainWaterImpl::two_pointer(@height) == 0, "two_ptr asc");
+        assert!(RainWaterImpl::solve(@height) == 0, "solve asc");
     }
 
     #[test]
     fn test_v_shape() {
-        // [5,0,5] -> 5
-        let mut height: Array<u32> = ArrayTrait::new();
-        height.append(5);
-        height.append(0);
-        height.append(5);
-        assert(trap(@height) == 5, 'V-shape should be 5');
+        let height = array![5, 0, 5];
+        assert!(RainWaterImpl::brute_force(@height) == 5, "brute_force v");
+        assert!(RainWaterImpl::dynamic_programming(@height) == 5, "dp v");
+        assert!(RainWaterImpl::two_pointer(@height) == 5, "two_ptr v");
+        assert!(RainWaterImpl::solve(@height) == 5, "solve v");
     }
 }

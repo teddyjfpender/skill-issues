@@ -5,3 +5,6 @@ Scarb.lock
 
 # Ralph loop runtime state (per-prompt attempt history)
 .ralph/
+
+# state files
+.state
