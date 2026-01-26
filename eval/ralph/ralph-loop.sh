@@ -74,6 +74,7 @@ Directory Options:
   --work-dir <path>            Scarb project directory (default: eval/work/<prompt-id>)
 
 Other:
+  --no-metrics                 Disable metrics tracking
   --help, -h                   Show this help
 
 Exit Codes:
@@ -98,6 +99,7 @@ timeout=120
 pre_validate=0
 ralph_dir=""
 work_dir=""
+metrics_enabled=1
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -115,6 +117,7 @@ while [[ $# -gt 0 ]]; do
     --pre-validate) pre_validate=1; shift ;;
     --ralph-dir) ralph_dir="$2"; shift 2 ;;
     --work-dir) work_dir="$2"; shift 2 ;;
+    --no-metrics) metrics_enabled=0; shift ;;
     --help|-h) usage; exit 0 ;;
     *) log_error "Unknown argument: $1"; usage >&2; exit 3 ;;
   esac
@@ -197,6 +200,9 @@ review_schema="$script_dir/schema/review-output.schema.json"
 # History path
 history_path="$ralph_dir/history.json"
 
+# Metrics path
+metrics_path="$ralph_dir/metrics.json"
+
 echo ""
 log_info "=========================================="
 log_info "  Ralph Loop: $prompt_id"
@@ -243,6 +249,89 @@ EOF
 )
 python3 "$script_dir/update-history.py" init "$history_path" "$prompt_id" --config "$config_json"
 log_success "History initialized"
+
+# Initialize metrics
+if [[ "$metrics_enabled" -eq 1 ]]; then
+  log_step "Initializing metrics..."
+  rubric_id="$(basename "$rubric_path")"
+  rubric_id="${rubric_id%.md}"
+
+  # Estimate tokens from prompt
+  tokens_est=$(($(wc -c < "$prompt_path") / 4))
+
+  # Convert skills to comma-separated list
+  skills_combined=""
+  if [[ -n "$driver_skills" ]]; then
+    skills_combined="$driver_skills"
+  fi
+  if [[ -n "$reviewer_skills" ]]; then
+    if [[ -n "$skills_combined" ]]; then
+      skills_combined="$skills_combined,$reviewer_skills"
+    else
+      skills_combined="$reviewer_skills"
+    fi
+  fi
+
+  python3 "$script_dir/metrics.py" start \
+    --prompt-id "$prompt_id" \
+    --rubric-id "$rubric_id" \
+    --output "$metrics_path" \
+    --driver-backend "$driver_backend" \
+    --driver-model "$driver_model" \
+    --reviewer-backend "$reviewer_backend" \
+    --reviewer-model "$reviewer_model" \
+    --skills "$skills_combined" \
+    --steps-total 1 \
+    --max-iterations "$max_attempts" \
+    --tokens "$tokens_est"
+  log_success "Metrics initialized"
+fi
+
+# Helper functions for metrics
+record_iteration() {
+  if [[ "$metrics_enabled" -ne 1 ]]; then
+    return 0
+  fi
+
+  local attempt_num="$1"
+  local status="$2"
+  local errors="${3:-}"
+  local duration="${4:-0}"
+
+  local args=(--metrics-path "$metrics_path" --attempt-num "$attempt_num" --status "$status")
+  if [[ -n "$errors" ]]; then
+    args+=(--errors "$errors")
+  fi
+  if [[ "$duration" != "0" ]]; then
+    args+=(--duration "$duration")
+  fi
+
+  python3 "$script_dir/metrics.py" iteration "${args[@]}"
+}
+
+finalize_metrics() {
+  if [[ "$metrics_enabled" -ne 1 ]]; then
+    return 0
+  fi
+
+  local status="$1"
+  local final_code="${2:-}"
+
+  local args=(--metrics-path "$metrics_path" --status "$status")
+  if [[ -n "$final_code" ]]; then
+    args+=(--final-code "$final_code")
+  fi
+
+  python3 "$script_dir/metrics.py" end "${args[@]}"
+}
+
+print_metrics_summary() {
+  if [[ "$metrics_enabled" -ne 1 ]]; then
+    return 0
+  fi
+
+  python3 "$script_dir/metrics.py" summary --metrics-path "$metrics_path"
+}
 
 # Function to run an AI backend
 run_backend() {
@@ -358,6 +447,7 @@ parse_review() {
 for attempt in $(seq 1 "$max_attempts"); do
   attempt_dir="$ralph_dir/attempts/$(printf '%03d' "$attempt")"
   mkdir -p "$attempt_dir"
+  attempt_start_time=$(date +%s)
 
   echo ""
   log_info "=========================================="
@@ -399,6 +489,12 @@ for attempt in $(seq 1 "$max_attempts"); do
       --source "build" --summary "Driver generation failed" \
       --errors '["Driver did not produce output"]'
     python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
+
+    # Record failed iteration in metrics
+    attempt_end_time=$(date +%s)
+    attempt_duration=$((attempt_end_time - attempt_start_time))
+    record_iteration "$attempt" "failed" "[\"Driver generation failed (exit: $driver_exit)\"]" "$attempt_duration"
+
     continue
   fi
 
@@ -453,6 +549,14 @@ for attempt in $(seq 1 "$max_attempts"); do
     log_error "Reviewer determined problem is unfixable"
     python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
     python3 "$script_dir/update-history.py" finish "$history_path" --status unfixable
+
+    # Record failed iteration and finalize metrics
+    attempt_end_time=$(date +%s)
+    attempt_duration=$((attempt_end_time - attempt_start_time))
+    record_iteration "$attempt" "failed" "[\"Reviewer: UNFIXABLE\"]" "$attempt_duration"
+    finalize_metrics "fail"
+    print_metrics_summary
+
     exit 2
   fi
 
@@ -465,6 +569,12 @@ for attempt in $(seq 1 "$max_attempts"); do
       --source "reviewer" --summary "Code review found issues" \
       --errors "[\"$issues_text\"]" --hints "$hints"
     python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
+
+    # Record failed iteration in metrics
+    attempt_end_time=$(date +%s)
+    attempt_duration=$((attempt_end_time - attempt_start_time))
+    record_iteration "$attempt" "failed" "[\"Reviewer: INVALID - $issues_text\"]" "$attempt_duration"
+
     continue
   fi
 
@@ -489,6 +599,12 @@ for attempt in $(seq 1 "$max_attempts"); do
     python3 "$script_dir/update-history.py" set-feedback "$history_path" "$attempt" \
       --source "build" --summary "Verification did not complete"
     python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
+
+    # Record failed iteration in metrics
+    attempt_end_time=$(date +%s)
+    attempt_duration=$((attempt_end_time - attempt_start_time))
+    record_iteration "$attempt" "failed" "[\"Verification did not produce verify.json\"]" "$attempt_duration"
+
     continue
   fi
 
@@ -512,11 +628,20 @@ for attempt in $(seq 1 "$max_attempts"); do
     log_success "=========================================="
 
     # Copy final code
-    cp "$code_file" "$ralph_dir/final.cairo"
-    log_success "Final code: $ralph_dir/final.cairo"
+    final_code_path="$ralph_dir/final.cairo"
+    cp "$code_file" "$final_code_path"
+    log_success "Final code: $final_code_path"
 
     python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
     python3 "$script_dir/update-history.py" finish "$history_path" --status success --successful-attempt "$attempt"
+
+    # Record successful iteration and finalize metrics
+    attempt_end_time=$(date +%s)
+    attempt_duration=$((attempt_end_time - attempt_start_time))
+    record_iteration "$attempt" "success" "" "$attempt_duration"
+    finalize_metrics "pass" "$final_code_path"
+    print_metrics_summary
+
     exit 0
   fi
 
@@ -534,6 +659,13 @@ for attempt in $(seq 1 "$max_attempts"); do
     --source "$source" --summary "$summary" --errors "$errors" --hints "$hints"
 
   python3 "$script_dir/update-history.py" end-attempt "$history_path" "$attempt"
+
+  # Record failed iteration in metrics
+  attempt_end_time=$(date +%s)
+  attempt_duration=$((attempt_end_time - attempt_start_time))
+  # Get first error from feedback
+  first_error="$(echo "$errors" | jq -r '.[0] // "Verification failed"' 2>/dev/null || echo 'Verification failed')"
+  record_iteration "$attempt" "failed" "[\"$first_error\"]" "$attempt_duration"
 done
 
 # Max attempts exhausted
@@ -543,4 +675,9 @@ log_error "  FAILURE: Max attempts ($max_attempts) exhausted"
 log_error "=========================================="
 
 python3 "$script_dir/update-history.py" finish "$history_path" --status failure
+
+# Finalize metrics with failure
+finalize_metrics "fail"
+print_metrics_summary
+
 exit 1

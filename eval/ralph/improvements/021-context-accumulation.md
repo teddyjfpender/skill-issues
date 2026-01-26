@@ -197,6 +197,6 @@ When using partial context, ensure:
 - [x] Added token estimation
 - [x] Added truncation function
 - [ ] Implement smart section extraction
-- [ ] Add context size warnings
+- [x] Add context size warnings (estimate_tokens and check_context_size in step-loop.sh)
 - [ ] Benchmark different strategies
 - [ ] Add context caching

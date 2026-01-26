@@ -112,6 +112,18 @@ Fix: Add missing trait bounds to function signature
        │ ✓
        ▼
 ┌─────────────┐
+│ Formatting  │────▶ Warn only
+│ (scarb fmt) │      (non-blocking)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Linting     │────▶ Warn only
+│ (scarb lint)│      (non-blocking)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
 │ Success!    │
 │ Save Code   │
 └─────────────┘
@@ -188,6 +200,8 @@ validate_with_timeout() {
 - [x] Added validation type detection
 - [x] Added error feedback extraction
 - [x] Added timeout handling
-- [ ] Add syntax check phase
-- [ ] Add partial test success handling
+- [x] Add syntax check phase (scarb check before build in step-loop.sh)
+- [x] Add partial test success handling (pass/fail counts displayed)
+- [x] Add formatting check (scarb fmt --check) after build passes
+- [x] Add linting check (scarb lint) after build passes
 - [ ] Add validation caching for unchanged code

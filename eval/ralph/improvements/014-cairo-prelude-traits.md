@@ -133,4 +133,4 @@ This issue caused Step 1 to fail 3 times with Codex before we identified the pat
 - [x] Listed traits that DO need import
 - [x] Tested with matrix algebra prompt
 - [ ] Add linter to detect incorrect imports
-- [ ] Create import cheat sheet for prompts
+- [x] Create import cheat sheet for prompts (added to cairo-quirks/references/quirks.md)

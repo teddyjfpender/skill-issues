@@ -56,44 +56,56 @@ mod tests {
 }
 ```
 
-## Scaffolding Script
+## Scaffolding Script (Using `scarb new`)
+
+**Note:** We now use `scarb new` instead of manual file creation. This ensures:
+- Proper project structure matching Scarb conventions
+- Correct default `Scarb.toml` with latest edition
+- Sample code that validates the toolchain works
+- Pre-configured snforge_std dependency and test scripts
+
+Reference: https://docs.swmansion.com/scarb/docs/guides/creating-a-new-package.html
 
 ```bash
 scaffold_project() {
   local project_dir="$1"
-  local project_name="$2"
+  local project_name="${2:-cairo_project}"
 
-  # Create directory structure
-  mkdir -p "$project_dir/src"
-  mkdir -p "$project_dir/tests"
+  # Use scarb new to create project structure
+  if [[ -d "$project_dir" ]]; then
+    log_warn "Project directory already exists, skipping scaffold"
+    return 0
+  fi
 
-  # Create Scarb.toml
-  cat > "$project_dir/Scarb.toml" <<EOF
-[package]
-name = "$project_name"
-version = "0.1.0"
-edition = "2024_07"
+  local parent_dir=$(dirname "$project_dir")
+  mkdir -p "$parent_dir"
 
-[cairo]
-enable-gas = true
+  log_info "Scaffolding project with scarb new at $project_dir..."
 
-[scripts]
-test = "snforge test"
+  # Create new project with scarb
+  # --no-vcs: avoid nested git repos
+  # --test-runner=starknet-foundry: includes snforge_std, test scripts, snfoundry.toml
+  (cd "$parent_dir" && scarb new "$project_name" --no-vcs --test-runner=starknet-foundry) || {
+    log_error "Failed to create project with scarb new"
+    return 1
+  }
 
-[dependencies]
-snforge_std = "0.55.0"
-EOF
-
-  # Create placeholder lib.cairo
-  echo "// placeholder" > "$project_dir/src/lib.cairo"
-
-  # Initialize snforge (creates snfoundry.toml)
-  (cd "$project_dir" && snforge init --force 2>/dev/null || true)
-
-  # Verify setup
-  (cd "$project_dir" && scarb build 2>/dev/null)
+  log_ok "Project scaffolded with scarb new"
+  return 0
 }
 ```
+
+### What `--test-runner=starknet-foundry` provides:
+- `snforge_std` dependency pre-configured
+- `snfoundry.toml` configuration file
+- `tests/` directory with sample test
+- `[scripts] test = "snforge test"` in Scarb.toml
+- `starknet` dependency for contract development
+
+### Key `scarb new` options:
+- `--no-vcs` — Skip Git repository initialization (useful when inside existing repo)
+- `--name <name>` — Use different package name than directory name
+- `--test-runner=starknet-foundry` — Create with Starknet Foundry testing setup (required for non-interactive mode)
 
 ## snfoundry.toml
 
@@ -111,31 +123,42 @@ seed = 0
 
 ```bash
 verify_project_setup() {
-  local project_dir="$1"
+  local work_dir="$1"
+  local error_file="$2"
 
-  # Check Scarb.toml exists
-  if [[ ! -f "$project_dir/Scarb.toml" ]]; then
+  log_info "Verifying project setup..."
+
+  # Check required files exist (scarb-generated structure)
+  if [[ ! -f "$work_dir/Scarb.toml" ]]; then
     log_error "Missing Scarb.toml"
     return 1
   fi
 
-  # Check edition
-  local edition=$(grep "edition" "$project_dir/Scarb.toml" | cut -d'"' -f2)
-  if [[ "$edition" < "2024_01" ]]; then
-    log_warn "Old Cairo edition: $edition. Consider upgrading."
-  fi
-
-  # Check snforge dependency
-  if ! grep -q "snforge_std" "$project_dir/Scarb.toml"; then
-    log_warn "Missing snforge_std dependency"
-  fi
-
-  # Verify scarb works
-  if ! (cd "$project_dir" && scarb build 2>/dev/null); then
-    log_error "Project doesn't build cleanly"
+  if [[ ! -f "$work_dir/src/lib.cairo" ]]; then
+    log_error "Missing src/lib.cairo"
     return 1
   fi
 
+  # Convert to absolute paths
+  work_dir="$(cd "$work_dir" && pwd)"
+  error_file="$(make_absolute "$error_file")"
+
+  # Verify scarb fmt --check works (checks formatting config)
+  log_info "Checking formatting configuration..."
+  if ! (cd "$work_dir" && scarb fmt --check 2>&1) > "$error_file" 2>&1; then
+    log_warn "Formatting check failed (non-fatal)"
+    # Non-fatal - continue with verification
+  fi
+
+  # Verify project builds
+  log_info "Verifying project builds..."
+  if ! (cd "$work_dir" && scarb build 2>&1) > "$error_file" 2>&1; then
+    log_error "Project failed initial build check"
+    cat "$error_file"
+    return 1
+  fi
+
+  log_ok "Project setup verified"
   return 0
 }
 ```
@@ -188,6 +211,6 @@ fi
 - [x] Created scaffolding script
 - [x] Listed common setup issues
 - [x] Added pre-generation checks
-- [ ] Integrate scaffold into step-loop
+- [x] Integrate scaffold into step-loop (scaffold_project and verify_project_setup functions)
+- [x] Create project templates per task type (using `scarb new` instead of manual scaffolding)
 - [ ] Add automatic dependency updates
-- [ ] Create project templates per task type

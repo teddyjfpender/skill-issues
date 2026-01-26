@@ -195,6 +195,6 @@ test_format_compliance() {
 - [x] Added structural instructions
 - [x] Implemented backend-specific formats
 - [x] Added format validation
-- [ ] Add recovery strategies
-- [ ] Add compliance testing
+- [x] Add recovery strategies (eval/ralph/recover-output.sh with 5 strategies)
+- [x] Add compliance testing (test_format_compliance function)
 - [ ] Track format compliance rates

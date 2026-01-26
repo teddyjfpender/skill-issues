@@ -94,7 +94,7 @@ run_generation() {
 - [x] Added Claude backend support to step-loop.sh
 - [x] Added `--backend` CLI flag
 - [x] Disabled auto_context for Codex
-- [ ] Add backend recommendation based on task type
+- [x] Add backend recommendation based on task type
 - [ ] Benchmark different models for generation speed
 
 ## References

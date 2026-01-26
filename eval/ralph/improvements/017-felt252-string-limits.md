@@ -141,6 +141,6 @@ panic!("Matrix dimensions incompatible for multiplication");
 - [x] Documented the 31-char limit
 - [x] Provided common short messages
 - [x] Showed alternative approaches
-- [ ] Add to cairo-quirks skill
+- [x] Add to cairo-quirks skill (added to quirks.md with examples and shortening strategies)
 - [ ] Create message shortening helper
 - [ ] Add lint rule for long felt252 strings

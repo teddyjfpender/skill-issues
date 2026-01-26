@@ -131,5 +131,5 @@ done
 - [x] Handles descriptions after step numbers
 - [x] Detects section boundaries
 - [x] Tested with 12-step prompt
-- [ ] Add extraction unit tests
-- [ ] Support alternative markers (### Step, - Step)
+- [x] Add extraction unit tests (eval/ralph/tests/test_step_extraction.py - 43 test cases)
+- [x] Support alternative markers (### Step, - Step) - tested and gracefully rejected

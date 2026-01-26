@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ralph Loop Metrics",
+  "description": "Metrics and timing data for a ralph loop run",
+  "type": "object",
+  "required": [
+    "prompt_id",
+    "rubric_id",
+    "start_time",
+    "correctness",
+    "iterations",
+    "steps_completed",
+    "steps_total"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "prompt_id": {
+      "type": "string",
+      "description": "Unique identifier for the prompt being processed"
+    },
+    "rubric_id": {
+      "type": "string",
+      "description": "Unique identifier for the rubric used"
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run started (ISO 8601)"
+    },
+    "end_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run ended (ISO 8601)"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total duration of the run in seconds"
+    },
+    "iterations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of iteration/retry attempts made"
+    },
+    "max_iterations": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum iterations allowed for the run"
+    },
+    "steps_completed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of steps successfully completed"
+    },
+    "steps_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of steps in the prompt"
+    },
+    "correctness": {
+      "type": "string",
+      "enum": ["running", "pass", "fail", "partial"],
+      "description": "Final status of the run"
+    },
+    "skills_used": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of skill names loaded during the run"
+    },
+    "driver_backend": {
+      "type": "string",
+      "enum": ["", "codex", "claude"],
+      "description": "Backend used for the driver agent"
+    },
+    "driver_model": {
+      "type": "string",
+      "description": "Model name used for the driver agent"
+    },
+    "reviewer_backend": {
+      "type": "string",
+      "enum": ["", "codex", "claude"],
+      "description": "Backend used for the reviewer agent"
+    },
+    "reviewer_model": {
+      "type": "string",
+      "description": "Model name used for the reviewer agent"
+    },
+    "tokens_estimated": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Estimated total token count for prompts"
+    },
+    "errors_encountered": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "timeout",
+          "syntax_error",
+          "import_error",
+          "type_error",
+          "undefined_reference",
+          "test_failure",
+          "build_error",
+          "network_error",
+          "other_error"
+        ]
+      },
+      "description": "List of unique error categories encountered"
+    },
+    "final_code_path": {
+      "type": "string",
+      "description": "Path to the final generated code file (if successful)"
+    },
+    "step_details": {
+      "type": "array",
+      "description": "Detailed record of each step",
+      "items": {
+        "type": "object",
+        "required": ["step", "status", "duration_seconds", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Step number (1-indexed)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "failed", "skipped"],
+            "description": "Step completion status"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Time taken for this step in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this step was recorded"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Error messages from this step"
+          }
+        }
+      }
+    },
+    "iteration_details": {
+      "type": "array",
+      "description": "Detailed record of each iteration attempt",
+      "items": {
+        "type": "object",
+        "required": ["attempt", "status", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Attempt number (1-indexed)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed", "timeout"],
+            "description": "Iteration completion status"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Time taken for this iteration in seconds"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this iteration was recorded"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Error messages from this iteration"
+          }
+        }
+      }
+    }
+  }
+}

@@ -117,4 +117,4 @@ This issue caused Step 7 to fail multiple times. The generated code was logicall
 - [x] Added examples of all three solutions
 - [x] Tested with matrix_vector_mul function
 - [ ] Add trait bound analyzer to detect mismatches
-- [ ] Create trait bound cheat sheet
+- [x] Create trait bound cheat sheet (added to cairo-quirks/references/quirks.md)

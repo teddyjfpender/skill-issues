@@ -124,5 +124,6 @@ fi
 - [x] Added fallback extraction logic
 - [x] Strengthened output format instructions
 - [x] Added empty code validation
-- [ ] Add Cairo syntax validation
+- [x] Add Cairo syntax validation (via scarb check in validation phase)
+- [x] Add Cairo linting validation (via scarb lint in validation phase)
 - [ ] Add extraction success metrics

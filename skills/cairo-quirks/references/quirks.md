@@ -235,6 +235,40 @@ let c = 0_u128;     // u128
 let d = 1_felt252;  // felt252
 ```
 
+### felt252 String Limits
+
+**CRITICAL**: felt252 short strings have a **maximum of 31 characters**. This limit is commonly encountered in:
+- `panic!()` messages
+- `assert!()` error messages
+- Error strings in `Result::Err`
+
+```cairo
+// WRONG - too long (32+ characters)
+panic!("Matrix dimension mismatch error");  // Error: string too long!
+assert!(valid, "Invalid matrix dimensions provided");  // Error!
+
+// CORRECT - shortened to 31 chars or less
+panic!("dim mismatch");  // 12 chars, works!
+assert!(valid, "invalid dims");  // 12 chars, works!
+```
+
+**Shortening strategies:**
+| Long Message | Short Version | Chars |
+|--------------|---------------|-------|
+| "Matrix dimension mismatch" | "dim mismatch" | 12 |
+| "Index out of bounds" | "idx OOB" | 7 |
+| "Division by zero" | "div by 0" | 8 |
+| "Invalid input parameter" | "bad input" | 9 |
+| "Overflow in multiplication" | "mul overflow" | 12 |
+| "Incompatible matrix sizes" | "size mismatch" | 13 |
+
+**Alternative: Use error codes:**
+```cairo
+// For complex error handling, use codes
+panic!("E001");  // Document: E001 = dimension mismatch
+panic!("E002");  // Document: E002 = index out of bounds
+```
+
 ## Testing Quirks
 
 ### Assert Messages Must Be String Literals
@@ -346,6 +380,27 @@ use core::array::{Array, ArrayTrait};  // Array operations
 use core::option::OptionTrait;  // Option::unwrap(), etc.
 ```
 
+### Import Cheat Sheet
+
+Quick reference for what needs importing vs what's in the prelude:
+
+| Need | Import? | Notes |
+|------|---------|-------|
+| `Add`, `Sub`, `Mul`, `Div` | **NO** | Prelude traits - use directly |
+| `PartialEq`, `PartialOrd` | **NO** | Prelude traits - use directly |
+| `Into`, `TryInto` | **NO** | Prelude traits - use directly |
+| `Drop`, `Copy`, `Clone` | **NO** | Prelude traits - use directly |
+| `Neg` | **NO** | Prelude trait - use directly |
+| `Array`, `Span` | **NO** | Prelude types - use directly |
+| `Option`, `Result` | **NO** | Prelude types - use directly |
+| `Zero`, `One` | **YES** | `use core::num::traits::{Zero, One};` |
+| `OptionTrait` | **YES** | `use core::option::OptionTrait;` |
+| `ResultTrait` | **YES** | `use core::result::ResultTrait;` |
+| `ArrayTrait` | **YES** | `use core::array::ArrayTrait;` |
+| `SpanTrait` | **YES** | `use core::array::SpanTrait;` |
+
+**Rule of thumb:** Basic types and operator traits are prelude. Trait methods like `.zero()`, `.unwrap()`, `.append()` need their trait imported.
+
 ### Generic Trait Bounds
 
 When defining generic implementations, use trait bounds as implicit parameters:
@@ -387,6 +442,62 @@ pub fn matrix_vector_mul<T, +Drop<T>, +Copy<T>, +Add<T>, +Mul<T>, +Zero<T>>(
     let val = *matrix.data.at(to_usize(idx));  // Direct access, fewer bounds needed
 }
 ```
+
+### Trait Bounds Cheat Sheet for Standalone Functions
+
+**CRITICAL**: When a standalone function (not a method with `self`) calls trait methods, it must include ALL trait bounds from the impl that defines those methods.
+
+**The Rule:** If `MatrixImpl<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>>` defines method `get_unchecked`, then ANY standalone function calling `get_unchecked` needs those SAME bounds.
+
+**Complete Example:**
+
+```cairo
+// The impl defines what bounds are needed for its methods
+impl MatrixImpl<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>> of MatrixTrait<T> {
+    fn new(rows: u32, cols: u32) -> Matrix<T> { ... }
+    fn get_unchecked(self: @Matrix<T>, row: u32, col: u32) -> T { ... }
+    fn transpose(self: @Matrix<T>) -> Matrix<T> { ... }
+}
+
+// WRONG - This standalone function is missing bounds
+// Error: "Method get_unchecked could not be called on type Matrix<T>"
+pub fn trace<T, +Drop<T>, +Copy<T>, +Add<T>, +Zero<T>>(matrix: @Matrix<T>) -> T {
+    let mut sum = Zero::zero();
+    let n = *matrix.rows;
+    let mut i: u32 = 0;
+    while i < n {
+        sum = sum + matrix.get_unchecked(i, i);  // FAILS - missing Sub, Mul, One bounds!
+        i += 1;
+    };
+    sum
+}
+
+// CORRECT - Include ALL bounds from MatrixImpl
+pub fn trace<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>>(
+    matrix: @Matrix<T>
+) -> T {
+    let mut sum = Zero::zero();
+    let n = *matrix.rows;
+    let mut i: u32 = 0;
+    while i < n {
+        sum = sum + matrix.get_unchecked(i, i);  // WORKS!
+        i += 1;
+    };
+    sum
+}
+```
+
+**Common mistake pattern:**
+```cairo
+// You might think: "My function only uses Add and Zero, why do I need Sub, Mul, One?"
+// Answer: Because the METHOD you're calling is defined in an impl that requires them ALL.
+// Cairo needs to resolve which impl provides the method, and that requires matching ALL bounds.
+```
+
+**Quick checklist for standalone functions:**
+1. Find the impl that defines the method you want to call
+2. Copy ALL its trait bounds to your function signature
+3. Even if your function doesn't directly use those traits, include them anyway
 
 ## Memory and Ownership
 

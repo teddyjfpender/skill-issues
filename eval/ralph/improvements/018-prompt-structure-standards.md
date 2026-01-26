@@ -184,6 +184,6 @@ Implement the operations.    <!-- Which operations? -->
 - [x] Created parsing requirements
 - [x] Listed anti-patterns
 - [x] Provided complete example
-- [ ] Create prompt template generator
-- [ ] Add prompt linter/validator
+- [x] Create prompt template generator (eval/ralph/generate-prompt.py)
+- [x] Add prompt linter/validator (eval/ralph/lint-prompt.py)
 - [ ] Create VS Code snippet for step structure

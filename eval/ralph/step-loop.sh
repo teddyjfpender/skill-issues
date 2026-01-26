@@ -23,6 +23,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m'
 
 log_step()  { echo -e "${CYAN}[STEP $1]${NC} $2"; }
@@ -30,6 +31,51 @@ log_ok()    { echo -e "${GREEN}[OK]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_info()  { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_suggest() { echo -e "${MAGENTA}[SUGGEST]${NC} $1"; }
+
+# ============================================================
+# Token Estimation & Context Warnings
+# ============================================================
+
+estimate_tokens() {
+  local content="$1"
+  local chars=$(echo "$content" | wc -c | tr -d ' ')
+  echo $((chars / 4))
+}
+
+check_context_size() {
+  local content="$1"
+  local tokens=$(estimate_tokens "$content")
+
+  if [[ $tokens -gt 16000 ]]; then
+    log_warn "Context very large (~$tokens tokens). Consider splitting prompts or summarizing."
+  elif [[ $tokens -gt 8000 ]]; then
+    log_warn "Context size warning: ~$tokens tokens accumulated. May affect generation quality."
+  fi
+}
+
+# ============================================================
+# Backend Recommendation
+# ============================================================
+
+recommend_backend() {
+  local prompt_content="$1"
+  local current_backend="$2"
+
+  # Check for exploratory patterns
+  local exploratory_patterns="explore|research|investigate|analyze|understand|study|examine|compare|evaluate"
+  local generative_patterns="implement|create|build|write|generate|develop|construct"
+
+  if echo "$prompt_content" | grep -qiE "$exploratory_patterns"; then
+    if [[ "$current_backend" == "codex" ]]; then
+      log_suggest "Task appears exploratory. Consider using --backend claude for better reasoning."
+    fi
+  elif echo "$prompt_content" | grep -qiE "$generative_patterns"; then
+    if [[ "$current_backend" == "claude" ]]; then
+      log_suggest "Task appears generative. Codex backend may be faster for code generation."
+    fi
+  fi
+}
 
 # Find timeout command (macOS uses gtimeout from coreutils)
 TIMEOUT_CMD=""
@@ -53,6 +99,11 @@ run_with_timeout() {
 # Script directory
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 
+# Source output recovery functions
+if [[ -f "$script_dir/recover-output.sh" ]]; then
+  source "$script_dir/recover-output.sh"
+fi
+
 # Defaults
 prompt_path=""
 rubric_path=""
@@ -63,6 +114,7 @@ model=""
 skills=""
 max_retries=3
 timeout=120
+metrics_enabled=1
 
 usage() {
   cat <<EOF
@@ -80,6 +132,7 @@ Options:
   --skills <skills>     Comma-separated skill names
   --max-retries <n>     Max retries per step (default: 3)
   --timeout <seconds>   Timeout per generation (default: 120)
+  --no-metrics          Disable metrics tracking
 EOF
 }
 
@@ -95,6 +148,7 @@ while [[ $# -gt 0 ]]; do
     --skills) skills="$2"; shift 2 ;;
     --max-retries) max_retries="$2"; shift 2 ;;
     --timeout) timeout="$2"; shift 2 ;;
+    --no-metrics) metrics_enabled=0; shift ;;
     --help|-h) usage; exit 0 ;;
     *) log_error "Unknown argument: $1"; usage >&2; exit 2 ;;
   esac
@@ -413,6 +467,104 @@ extract_code() {
 }
 
 # ============================================================
+# Project Scaffolding
+# ============================================================
+
+scaffold_project() {
+  local project_dir="$1"
+  local project_name="${2:-cairo_project}"
+
+  # Use scarb new to create project structure
+  if [[ -d "$project_dir" ]]; then
+    log_warn "Project directory already exists, skipping scaffold"
+    return 0
+  fi
+
+  local parent_dir=$(dirname "$project_dir")
+  mkdir -p "$parent_dir"
+
+  log_info "Scaffolding project with scarb new at $project_dir..."
+
+  # Create new project with scarb
+  # --no-vcs: avoid nested git repos
+  # --test-runner=starknet-foundry: includes snforge_std, test scripts, snfoundry.toml
+  (cd "$parent_dir" && scarb new "$project_name" --no-vcs --test-runner=starknet-foundry) || {
+    log_error "Failed to create project with scarb new"
+    return 1
+  }
+
+  log_ok "Project scaffolded with scarb new"
+  return 0
+}
+
+verify_project_setup() {
+  local work_dir="$1"
+  local error_file="$2"
+
+  log_info "Verifying project setup..."
+
+  # Check required files exist (scarb-generated structure)
+  if [[ ! -f "$work_dir/Scarb.toml" ]]; then
+    log_error "Missing Scarb.toml"
+    return 1
+  fi
+
+  if [[ ! -f "$work_dir/src/lib.cairo" ]]; then
+    log_error "Missing src/lib.cairo"
+    return 1
+  fi
+
+  # Convert to absolute paths
+  work_dir="$(cd "$work_dir" && pwd)"
+  error_file="$(make_absolute "$error_file")"
+
+  # Verify scarb fmt --check works (checks formatting config)
+  log_info "Checking formatting configuration..."
+  if ! (cd "$work_dir" && scarb fmt --check 2>&1) > "$error_file" 2>&1; then
+    log_warn "Formatting check failed (non-fatal)"
+    # Non-fatal - continue with verification
+  fi
+
+  # Verify project builds
+  log_info "Verifying project builds..."
+  if ! (cd "$work_dir" && scarb build 2>&1) > "$error_file" 2>&1; then
+    log_error "Project failed initial build check"
+    cat "$error_file"
+    return 1
+  fi
+
+  log_ok "Project setup verified"
+  return 0
+}
+
+# ============================================================
+# Formatting and Linting
+# ============================================================
+
+check_formatting() {
+  local work_dir="$1"
+  if (cd "$work_dir" && scarb fmt --check 2>&1); then
+    log_ok "Formatting check passed"
+    return 0
+  else
+    log_warn "Formatting issues detected (run 'scarb fmt' to fix)"
+    return 1
+  fi
+}
+
+run_linter() {
+  local work_dir="$1"
+  local output_file="$2"
+  if command -v cairo-lint &>/dev/null || (cd "$work_dir" && scarb lint --help &>/dev/null 2>&1); then
+    (cd "$work_dir" && scarb lint 2>&1) | tee "$output_file"
+    return ${PIPESTATUS[0]}
+  else
+    log_info "Linter not available, skipping"
+    return 0
+  fi
+}
+
+# ============================================================
 # Validation
 # ============================================================
 
@@ -428,6 +580,23 @@ make_absolute() {
   echo "$(cd "$dir" && pwd)/$base"
 }
 
+run_syntax_check() {
+  local work_dir="$1"
+  local code_content="$2"
+  local error_file="$3"
+
+  # Convert to absolute paths
+  work_dir="$(cd "$work_dir" && pwd)"
+  error_file="$(make_absolute "$error_file")"
+
+  # Write code to lib.cairo
+  echo "$code_content" > "$work_dir/src/lib.cairo"
+
+  # Run scarb check for fast syntax validation
+  (cd "$work_dir" && scarb check 2>&1) > "$error_file" 2>&1
+  return $?
+}
+
 validate_build() {
   local work_dir="$1"
   local code_content="$2"
@@ -440,7 +609,16 @@ validate_build() {
   # Write code to lib.cairo
   echo "$code_content" > "$work_dir/src/lib.cairo"
 
-  # Run scarb build from work directory, capture both stdout and stderr
+  # Run scarb check first for quick feedback
+  log_info "Running syntax check (scarb check)..."
+  if ! (cd "$work_dir" && scarb check 2>&1) > "$error_file" 2>&1; then
+    log_warn "Syntax check failed - skipping full build"
+    return 1
+  fi
+  log_ok "Syntax check passed"
+
+  # Run full scarb build
+  log_info "Running full build (scarb build)..."
   (cd "$work_dir" && scarb build 2>&1) > "$error_file" 2>&1
   return $?
 }
@@ -455,7 +633,120 @@ validate_tests() {
 
   # Run snforge test from work directory, capture both stdout and stderr
   (cd "$work_dir" && snforge test 2>&1) > "$error_file" 2>&1
-  return $?
+  local test_exit=$?
+
+  # Extract and display pass/fail counts
+  local passed=$(grep -c "^\[PASS\]" "$error_file" 2>/dev/null || echo 0)
+  local failed=$(grep -c "^\[FAIL\]" "$error_file" 2>/dev/null || echo 0)
+  local total=$((passed + failed))
+
+  if [[ $total -gt 0 ]]; then
+    if [[ $failed -gt 0 ]]; then
+      log_warn "Test results: $passed passed, $failed failed (out of $total)"
+    else
+      log_ok "Test results: $passed passed, $failed failed (out of $total)"
+    fi
+  fi
+
+  return $test_exit
+}
+
+# ============================================================
+# Metrics Tracking
+# ============================================================
+
+metrics_path=""
+
+init_metrics() {
+  if [[ "$metrics_enabled" -ne 1 ]]; then
+    return 0
+  fi
+
+  metrics_path="$state_dir/metrics.json"
+
+  # Extract IDs from paths
+  local prompt_id
+  prompt_id="$(basename "$prompt_path" .md)"
+  local rubric_id
+  rubric_id="$(basename "$rubric_path" .md)"
+
+  # Estimate tokens from prompt content
+  local tokens_est
+  tokens_est=$(estimate_tokens "$(cat "$prompt_path")")
+
+  python3 "$script_dir/metrics.py" start \
+    --prompt-id "$prompt_id" \
+    --rubric-id "$rubric_id" \
+    --output "$metrics_path" \
+    --driver-backend "$backend" \
+    --driver-model "$model" \
+    --skills "$skills" \
+    --steps-total "$total_steps" \
+    --max-iterations "$max_retries" \
+    --tokens "$tokens_est"
+}
+
+record_step_metrics() {
+  if [[ "$metrics_enabled" -ne 1 ]] || [[ -z "$metrics_path" ]]; then
+    return 0
+  fi
+
+  local step_num="$1"
+  local status="$2"
+  local duration="$3"
+  local errors="${4:-}"
+
+  local args=(--metrics-path "$metrics_path" --step-num "$step_num" --status "$status" --duration "$duration")
+  if [[ -n "$errors" ]]; then
+    args+=(--errors "$errors")
+  fi
+
+  python3 "$script_dir/metrics.py" step "${args[@]}"
+}
+
+record_iteration_metrics() {
+  if [[ "$metrics_enabled" -ne 1 ]] || [[ -z "$metrics_path" ]]; then
+    return 0
+  fi
+
+  local attempt_num="$1"
+  local status="$2"
+  local errors="${3:-}"
+  local duration="${4:-0}"
+
+  local args=(--metrics-path "$metrics_path" --attempt-num "$attempt_num" --status "$status")
+  if [[ -n "$errors" ]]; then
+    args+=(--errors "$errors")
+  fi
+  if [[ "$duration" != "0" ]]; then
+    args+=(--duration "$duration")
+  fi
+
+  python3 "$script_dir/metrics.py" iteration "${args[@]}"
+}
+
+finalize_metrics() {
+  if [[ "$metrics_enabled" -ne 1 ]] || [[ -z "$metrics_path" ]]; then
+    return 0
+  fi
+
+  local status="$1"
+  local final_code="${2:-}"
+
+  local args=(--metrics-path "$metrics_path" --status "$status")
+  if [[ -n "$final_code" ]]; then
+    args+=(--final-code "$final_code")
+  fi
+
+  python3 "$script_dir/metrics.py" end "${args[@]}"
+}
+
+print_metrics_summary() {
+  if [[ "$metrics_enabled" -ne 1 ]] || [[ -z "$metrics_path" ]]; then
+    return 0
+  fi
+
+  python3 "$script_dir/metrics.py" summary --metrics-path "$metrics_path"
 }
 
 # ============================================================
@@ -469,6 +760,27 @@ if [[ "$total_steps" -eq 0 ]]; then
   log_error "No steps found in prompt (looking for '## Step N' markers)"
   exit 2
 fi
+
+# Check for backend recommendation based on prompt content
+prompt_content=$(cat "$prompt_path")
+recommend_backend "$prompt_content" "$backend"
+
+# Verify or scaffold project setup
+setup_error_file="$state_dir/setup-errors.txt"
+mkdir -p "$state_dir"
+
+if [[ ! -f "$work_dir/Scarb.toml" ]]; then
+  log_warn "No Scarb.toml found - scaffolding project"
+  scaffold_project "$work_dir"
+fi
+
+if ! verify_project_setup "$work_dir" "$setup_error_file"; then
+  log_error "Project setup verification failed. Check $setup_error_file"
+  exit 2
+fi
+
+# Initialize metrics tracking
+init_metrics
 
 # Load or initialize state
 state_file="$state_dir/step-state.json"
@@ -502,9 +814,16 @@ while [[ $current_step -le $total_steps ]]; do
   retry=0
   error_feedback=""
   step_success=false
+  step_start_time=$(date +%s)
+
+  # Check context size before generation
+  if [[ -n "$accumulated_code" ]]; then
+    check_context_size "$accumulated_code"
+  fi
 
   while [[ $retry -lt $max_retries ]]; do
     attempt=$((retry + 1))
+    attempt_start_time=$(date +%s)
     log_info "Attempt $attempt of $max_retries"
 
     attempt_dir="$step_dir/attempt-$(printf '%03d' $attempt)"
@@ -534,6 +853,9 @@ while [[ $current_step -le $total_steps ]]; do
     if [[ $gen_exit -ne 0 ]] || [[ ! -s "$output_file" ]]; then
       log_warn "Generation failed (exit: $gen_exit)"
       error_feedback="Code generation failed or timed out"
+      attempt_end_time=$(date +%s)
+      attempt_duration=$((attempt_end_time - attempt_start_time))
+      record_iteration_metrics "$attempt" "failed" "[\"Generation failed (exit: $gen_exit)\"]" "$attempt_duration"
       ((retry++))
       continue
     fi
@@ -541,8 +863,21 @@ while [[ $current_step -le $total_steps ]]; do
     # Extract code
     new_code=$(extract_code "$output_file")
     if [[ -z "$new_code" ]]; then
-      log_warn "No code in output"
+      # Try recovery strategies if recover_output function is available
+      if type -t recover_output &>/dev/null; then
+        log_warn "Standard extraction failed, attempting recovery..."
+        new_code=$(recover_output "$output_file")
+        if [[ -n "$new_code" ]]; then
+          log_ok "Recovery successful"
+        fi
+      fi
+    fi
+    if [[ -z "$new_code" ]]; then
+      log_warn "No code in output (recovery also failed)"
       error_feedback="Output did not contain code (check for \`\`\`cairo blocks)"
+      attempt_end_time=$(date +%s)
+      attempt_duration=$((attempt_end_time - attempt_start_time))
+      record_iteration_metrics "$attempt" "failed" "[\"No code extracted from output\"]" "$attempt_duration"
       ((retry++))
       continue
     fi
@@ -573,17 +908,48 @@ while [[ $current_step -le $total_steps ]]; do
 
     if [[ $val_exit -eq 0 ]]; then
       log_ok "Step $current_step passed validation!"
+
+      # Run formatting check (non-blocking, just warn)
+      log_info "Checking code formatting..."
+      fmt_file="$attempt_dir/formatting.txt"
+      check_formatting "$work_dir" > "$fmt_file" 2>&1 || true
+
+      # Run linter if available (non-blocking, just warn)
+      log_info "Running linter..."
+      lint_file="$attempt_dir/lint.txt"
+      run_linter "$work_dir" "$lint_file" || log_warn "Lint warnings detected (see $lint_file)"
+
       accumulated_code="$new_code"
       step_success=true
+
+      # Record successful iteration
+      attempt_end_time=$(date +%s)
+      attempt_duration=$((attempt_end_time - attempt_start_time))
+      record_iteration_metrics "$attempt" "success" "" "$attempt_duration"
+
       break
     else
       log_warn "Validation failed"
       error_feedback=$(cat "$error_file" 2>/dev/null | head -50)
+
+      # Record failed iteration
+      attempt_end_time=$(date +%s)
+      attempt_duration=$((attempt_end_time - attempt_start_time))
+      # Escape for JSON (basic escaping)
+      local escaped_feedback
+      escaped_feedback=$(echo "$error_feedback" | head -1 | tr -d '\n' | sed 's/"/\\"/g')
+      record_iteration_metrics "$attempt" "failed" "[\"$escaped_feedback\"]" "$attempt_duration"
+
       ((retry++))
     fi
   done
 
   if [[ "$step_success" == "true" ]]; then
+    # Record step completion metrics
+    step_end_time=$(date +%s)
+    step_duration=$((step_end_time - step_start_time))
+    record_step_metrics "$current_step" "completed" "$step_duration"
+
     # Save state
     jq -n --arg step "$((current_step + 1))" --arg code "$accumulated_code" \
       '{"current_step": ($step | tonumber), "accumulated_code": $code}' > "$state_file"
@@ -593,7 +959,17 @@ while [[ $current_step -le $total_steps ]]; do
 
     ((current_step++))
   else
+    # Record step failure metrics
+    step_end_time=$(date +%s)
+    step_duration=$((step_end_time - step_start_time))
+    record_step_metrics "$current_step" "failed" "$step_duration" "[\"Max retries exceeded\"]"
+
     log_error "Step $current_step failed after $max_retries attempts"
+
+    # Finalize metrics with failure
+    finalize_metrics "fail"
+    print_metrics_summary
+
     exit 1
   fi
 done
@@ -601,8 +977,14 @@ done
 log_ok "All $total_steps steps completed successfully!"
 
 # Save final code
-echo "$accumulated_code" > "$state_dir/final.cairo"
+final_code_path="$state_dir/final.cairo"
+echo "$accumulated_code" > "$final_code_path"
 cp "$accumulated_code" "$work_dir/src/lib.cairo" 2>/dev/null || echo "$accumulated_code" > "$work_dir/src/lib.cairo"
 
-log_ok "Final code saved to $state_dir/final.cairo"
+log_ok "Final code saved to $final_code_path"
+
+# Finalize and display metrics
+finalize_metrics "pass" "$final_code_path"
+print_metrics_summary
+
 exit 0
