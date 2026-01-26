@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+#
+# skill-issues - High-level CLI for AI code generation evaluation
+#
+# Usage:
+#   skill-issues run <prompt-id> [options]
+#   skill-issues clean <prompt-id>
+#   skill-issues status <prompt-id>
+#
+set -euo pipefail
+
+# Resolve symlinks to get actual script location
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_SOURCE" ]]; do
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+  [[ "$SCRIPT_SOURCE" != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+VERSION="0.1.0"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m' # No Color
+
+show_banner() {
+  echo ""
+  echo -e "${CYAN}${BOLD}   ███████╗██╗  ██╗██╗██╗     ██╗          ██╗███████╗███████╗██╗   ██╗███████╗███████╗${NC}"
+  echo -e "${CYAN}${BOLD}   ██╔════╝██║ ██╔╝██║██║     ██║          ██║██╔════╝██╔════╝██║   ██║██╔════╝██╔════╝${NC}"
+  echo -e "${CYAN}${BOLD}   ███████╗█████╔╝ ██║██║     ██║          ██║███████╗███████╗██║   ██║█████╗  ███████╗${NC}"
+  echo -e "${CYAN}${BOLD}   ╚════██║██╔═██╗ ██║██║     ██║          ██║╚════██║╚════██║██║   ██║██╔══╝  ╚════██║${NC}"
+  echo -e "${CYAN}${BOLD}   ███████║██║  ██╗██║███████╗███████╗     ██║███████║███████║╚██████╔╝███████╗███████║${NC}"
+  echo -e "${CYAN}${BOLD}   ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝     ╚═╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝╚══════╝${NC}"
+  echo ""
+  echo -e "${DIM}   AI Code Generation Evaluation Framework · v${VERSION} · © 2025${NC}"
+  echo ""
+}
+
+show_help() {
+  show_banner
+  echo -e "${BOLD}USAGE${NC}"
+  echo "    skill-issues <command> <prompt-id> [options]"
+  echo ""
+  echo -e "${BOLD}COMMANDS${NC}"
+  echo "    run       Execute step-loop evaluation for a prompt"
+  echo "    clean     Remove work and state directories for a prompt"
+  echo "    status    Show metrics and status for a prompt"
+  echo "    list      List available prompts"
+  echo ""
+  echo -e "${BOLD}OPTIONS${NC}"
+  echo "    -b, --backend <name>     LLM backend: claude, codex (default: claude)"
+  echo "    -m, --model <name>       Model identifier (default: claude-sonnet-4-20250514)"
+  echo "    -s, --skills <list>      Comma-separated skills (default: cairo-quirks,cairo-quality)"
+  echo "    --multi-file             Enable modular file structure (default: enabled)"
+  echo "    --single-file            Disable modular file structure"
+  echo "    --retries <n>            Max retries per step (default: 3)"
+  echo "    --timeout <sec>          Timeout per LLM call (default: 180)"
+  echo "    --clean                  Clean before running"
+  echo "    -v, --verbose            Verbose output"
+  echo "    -h, --help               Show this help"
+  echo ""
+  echo -e "${BOLD}EXAMPLES${NC}"
+  echo -e "    ${DIM}# Run the trapping rain water evaluation${NC}"
+  echo "    skill-issues run cairo-trapping-rain-water-01"
+  echo ""
+  echo -e "    ${DIM}# Run with specific model${NC}"
+  echo "    skill-issues run cairo-trapping-rain-water-01 -m claude-opus-4-20250514"
+  echo ""
+  echo -e "    ${DIM}# Run without skills${NC}"
+  echo "    skill-issues run cairo-trapping-rain-water-01 -s none"
+  echo ""
+  echo -e "    ${DIM}# Clean and re-run${NC}"
+  echo "    skill-issues run cairo-trapping-rain-water-01 --clean"
+  echo ""
+  echo -e "    ${DIM}# Check status${NC}"
+  echo "    skill-issues status cairo-trapping-rain-water-01"
+  echo ""
+}
+
+show_run_header() {
+  local prompt_id="$1"
+  local backend="$2"
+  local model="$3"
+  local skills="$4"
+
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BOLD}  PROMPT${NC}    ${prompt_id}"
+  echo -e "${BOLD}  BACKEND${NC}   ${backend} / ${model}"
+  echo -e "${BOLD}  SKILLS${NC}    ${skills}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+}
+
+# Find prompt file
+find_prompt() {
+  local prompt_id="$1"
+  local prompt_file=""
+
+  # Check various locations
+  if [[ -f "${SCRIPT_DIR}/prompts/${prompt_id}.md" ]]; then
+    prompt_file="${SCRIPT_DIR}/prompts/${prompt_id}.md"
+  elif [[ -f "${SCRIPT_DIR}/prompts/${prompt_id}" ]]; then
+    prompt_file="${SCRIPT_DIR}/prompts/${prompt_id}"
+  elif [[ -f "${prompt_id}" ]]; then
+    prompt_file="${prompt_id}"
+  fi
+
+  echo "$prompt_file"
+}
+
+# Find rubric file
+find_rubric() {
+  local prompt_id="$1"
+  local rubric_file=""
+
+  # Check various locations (rubrics/ first, then rubric/)
+  if [[ -f "${SCRIPT_DIR}/rubrics/${prompt_id}.md" ]]; then
+    rubric_file="${SCRIPT_DIR}/rubrics/${prompt_id}.md"
+  elif [[ -f "${SCRIPT_DIR}/rubric/${prompt_id}.md" ]]; then
+    rubric_file="${SCRIPT_DIR}/rubric/${prompt_id}.md"
+  fi
+
+  echo "$rubric_file"
+}
+
+cmd_run() {
+  local prompt_id=""
+  local backend="claude"
+  local model="claude-sonnet-4-20250514"
+  local skills="cairo-quirks,cairo-quality"
+  local multi_file=1
+  local max_retries=3
+  local timeout=180
+  local clean_first=0
+  local verbose=0
+
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -b|--backend) backend="$2"; shift 2 ;;
+      -m|--model) model="$2"; shift 2 ;;
+      -s|--skills) skills="$2"; shift 2 ;;
+      --multi-file) multi_file=1; shift ;;
+      --single-file) multi_file=0; shift ;;
+      --retries) max_retries="$2"; shift 2 ;;
+      --timeout) timeout="$2"; shift 2 ;;
+      --clean) clean_first=1; shift ;;
+      -v|--verbose) verbose=1; shift ;;
+      -h|--help) show_help; exit 0 ;;
+      -*) echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
+      *) prompt_id="$1"; shift ;;
+    esac
+  done
+
+  if [[ -z "$prompt_id" ]]; then
+    echo -e "${RED}Error: prompt-id required${NC}"
+    echo "Usage: skill-issues run <prompt-id> [options]"
+    exit 1
+  fi
+
+  show_banner
+
+  # Find files
+  local prompt_file
+  prompt_file=$(find_prompt "$prompt_id")
+  if [[ -z "$prompt_file" ]]; then
+    echo -e "${RED}Error: Prompt not found: ${prompt_id}${NC}"
+    echo "Available prompts:"
+    cmd_list
+    exit 1
+  fi
+
+  local rubric_file
+  rubric_file=$(find_rubric "$prompt_id")
+  if [[ -z "$rubric_file" ]]; then
+    echo -e "${YELLOW}Warning: No rubric found for ${prompt_id}${NC}"
+    rubric_file=""
+  fi
+
+  # Derive paths from prompt ID
+  local work_dir="${SCRIPT_DIR}/work/${prompt_id}"
+  local state_dir="${SCRIPT_DIR}/ralph/.state/${prompt_id}"
+
+  # Clean if requested
+  if [[ "$clean_first" == "1" ]]; then
+    echo -e "${YELLOW}Cleaning previous run...${NC}"
+    rm -rf "$work_dir" "$state_dir"
+  fi
+
+  # Handle skills
+  local skills_arg=""
+  if [[ "$skills" != "none" && -n "$skills" ]]; then
+    skills_arg="--skills $skills"
+  fi
+
+  # Handle multi-file
+  local multi_file_arg=""
+  if [[ "$multi_file" == "1" ]]; then
+    multi_file_arg="--multi-file"
+  fi
+
+  # Handle rubric
+  local rubric_arg=""
+  if [[ -n "$rubric_file" ]]; then
+    rubric_arg="--rubric $rubric_file"
+  fi
+
+  show_run_header "$prompt_id" "$backend" "$model" "$skills"
+
+  # Build and execute command
+  local cmd="${SCRIPT_DIR}/ralph/step-loop.sh"
+  cmd+=" --prompt $prompt_file"
+  [[ -n "$rubric_arg" ]] && cmd+=" $rubric_arg"
+  cmd+=" --work-dir $work_dir"
+  cmd+=" --state-dir $state_dir"
+  cmd+=" --backend $backend"
+  cmd+=" --model $model"
+  [[ -n "$skills_arg" ]] && cmd+=" $skills_arg"
+  [[ -n "$multi_file_arg" ]] && cmd+=" $multi_file_arg"
+  cmd+=" --max-retries $max_retries"
+  cmd+=" --timeout $timeout"
+
+  if [[ "$verbose" == "1" ]]; then
+    echo -e "${DIM}$ ${cmd}${NC}"
+    echo ""
+  fi
+
+  # Execute
+  eval "$cmd"
+  local exit_code=$?
+
+  echo ""
+  if [[ $exit_code -eq 0 ]]; then
+    echo -e "${GREEN}${BOLD}✓ Evaluation completed successfully${NC}"
+  else
+    echo -e "${RED}${BOLD}✗ Evaluation failed (exit code: ${exit_code})${NC}"
+  fi
+
+  return $exit_code
+}
+
+cmd_clean() {
+  local prompt_id="$1"
+
+  if [[ -z "$prompt_id" ]]; then
+    echo -e "${RED}Error: prompt-id required${NC}"
+    exit 1
+  fi
+
+  show_banner
+
+  local work_dir="${SCRIPT_DIR}/work/${prompt_id}"
+  local state_dir="${SCRIPT_DIR}/ralph/.state/${prompt_id}"
+
+  echo -e "${YELLOW}Cleaning ${prompt_id}...${NC}"
+
+  if [[ -d "$work_dir" ]]; then
+    rm -rf "$work_dir"
+    echo -e "  ${DIM}Removed${NC} ${work_dir}"
+  fi
+
+  if [[ -d "$state_dir" ]]; then
+    rm -rf "$state_dir"
+    echo -e "  ${DIM}Removed${NC} ${state_dir}"
+  fi
+
+  echo -e "${GREEN}✓ Clean complete${NC}"
+}
+
+cmd_status() {
+  local prompt_id="$1"
+
+  if [[ -z "$prompt_id" ]]; then
+    echo -e "${RED}Error: prompt-id required${NC}"
+    exit 1
+  fi
+
+  show_banner
+
+  local metrics_file="${SCRIPT_DIR}/ralph/.state/${prompt_id}/metrics.json"
+  local work_dir="${SCRIPT_DIR}/work/${prompt_id}"
+
+  echo -e "${BOLD}Status: ${prompt_id}${NC}"
+  echo ""
+
+  if [[ -f "$metrics_file" ]]; then
+    echo -e "${CYAN}Metrics:${NC}"
+    cat "$metrics_file" | python3 -m json.tool 2>/dev/null || cat "$metrics_file"
+    echo ""
+  else
+    echo -e "${DIM}No metrics found${NC}"
+  fi
+
+  if [[ -d "$work_dir" ]]; then
+    echo -e "${CYAN}Generated files:${NC}"
+    find "$work_dir" -type f -name "*.cairo" | head -20 | while read -r f; do
+      echo -e "  ${DIM}${f#$work_dir/}${NC}"
+    done
+  else
+    echo -e "${DIM}No work directory${NC}"
+  fi
+}
+
+cmd_list() {
+  local prompts_dir="${SCRIPT_DIR}/prompts"
+
+  show_banner
+
+  if [[ ! -d "$prompts_dir" ]]; then
+    echo -e "${RED}No prompts directory found${NC}"
+    exit 1
+  fi
+
+  echo -e "${BOLD}Available prompts:${NC}"
+  echo ""
+  for f in "$prompts_dir"/*.md; do
+    if [[ -f "$f" ]]; then
+      local name
+      name=$(basename "$f" .md)
+      [[ "$name" == "README" ]] && continue
+      echo -e "    ${CYAN}▸${NC} $name"
+    fi
+  done
+  echo ""
+}
+
+# Main
+main() {
+  if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+  fi
+
+  local command="$1"
+  shift
+
+  case "$command" in
+    run)    cmd_run "$@" ;;
+    clean)  cmd_clean "$@" ;;
+    status) cmd_status "$@" ;;
+    list)   cmd_list ;;
+    -h|--help|help) show_help ;;
+    -v|--version) echo "skill-issues v${VERSION}" ;;
+    *)
+      echo -e "${RED}Unknown command: ${command}${NC}"
+      echo "Run 'skill-issues --help' for usage"
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
