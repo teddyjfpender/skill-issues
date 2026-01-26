@@ -1390,7 +1390,6 @@ while [[ $current_step -le $total_steps ]]; do
       # For test failures, extract and append the failing test source code
       if [[ "$validation_type" == "test" ]]; then
         # In multi-file mode, tests are in tests/test_lib.cairo; otherwise in src/lib.cairo
-        local test_file_path
         if [[ "$use_multi_file" == "1" ]]; then
           test_file_path="$work_dir/tests/test_lib.cairo"
         else
@@ -1429,7 +1428,6 @@ ${failing_test_source}
     # Save state (include multi-file flag and files if applicable)
     if [[ "$use_multi_file" == "1" && -n "$files_json" && -f "$files_json" ]]; then
       # Multi-file mode: save files.json content in state
-      local files_content
       files_content=$(cat "$files_json")
       jq -n --arg step "$((current_step + 1))" --arg code "$accumulated_code" \
         --argjson files "$files_content" --argjson multi_file true \
@@ -1456,10 +1454,10 @@ ${failing_test_source}
     log_error "Step $current_step failed after $max_retries attempts"
 
     # Calculate steps completed (previous step that was verified)
-    local steps_completed=$((current_step - 1))
+    steps_completed=$((current_step - 1))
 
     # Find the best code path (last verified step's code)
-    local best_code_path=""
+    best_code_path=""
     if [[ $steps_completed -gt 0 ]]; then
       best_code_path="$state_dir/verified-step-$(printf '%03d' $steps_completed).cairo"
       # Save accumulated code as best code if we have any
