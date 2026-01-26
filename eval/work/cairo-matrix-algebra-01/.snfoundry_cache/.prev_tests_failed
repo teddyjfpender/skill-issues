@@ -1,0 +1,2 @@
+cairo_matrix_algebra_01::tests::test_transpose_twice_returns_original
+cairo_matrix_algebra_01::tests::test_mul_dimension_validation

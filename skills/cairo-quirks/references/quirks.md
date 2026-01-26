@@ -260,15 +260,16 @@ fn test_addition() {
 }
 
 #[test]
-#[should_panic(expected: "overflow")]
+#[should_panic(expected: ("overflow",))]  // Note: tuple with trailing comma
 fn test_overflow_panics() {
     // code that should panic
 }
 
 #[test]
-#[available_gas(1000000)]  // Required for loops/recursion
 fn test_with_loop() {
-    let mut i = 0;
+    // NOTE: #[available_gas] is deprecated in newer versions
+    // For snforge 0.55+, gas tracking is automatic
+    let mut i = 0_u32;
     while i < 100 {
         i += 1;
     };
@@ -280,6 +281,8 @@ fn slow_test() {
     // expensive test
 }
 ```
+
+**NOTE**: The `#[available_gas(n)]` attribute is deprecated. Do NOT use it. Tests run with automatic gas tracking in snforge 0.55+.
 
 ## Struct and Type Issues
 
@@ -310,6 +313,78 @@ pub struct MyType {
 // Public function
 pub fn my_function() -> u64 {
     // ...
+}
+```
+
+## Import and Prelude Quirks
+
+### Traits in the Prelude (DO NOT IMPORT)
+
+These traits are in Cairo's prelude and available automatically - do NOT import them:
+
+```cairo
+// WRONG - will cause "Identifier not found" error
+use core::ops::{Add, Mul, Sub};  // Error!
+
+// CORRECT - use directly without import
+impl MyTypeAdd of Add<MyType> {
+    fn add(lhs: MyType, rhs: MyType) -> MyType { ... }
+}
+```
+
+**Prelude traits (do not import):**
+- `Add`, `Sub`, `Mul`, `Div` - arithmetic operators
+- `Neg` - unary negation
+- `PartialEq`, `PartialOrd` - comparison operators
+- `Drop`, `Copy`, `Clone` - memory traits
+- `Into`, `TryInto` - conversion traits
+
+**Traits that DO need import:**
+```cairo
+use core::num::traits::{Zero, One};  // Zero::zero(), One::one()
+use core::array::{Array, ArrayTrait};  // Array operations
+use core::option::OptionTrait;  // Option::unwrap(), etc.
+```
+
+### Generic Trait Bounds
+
+When defining generic implementations, use trait bounds as implicit parameters:
+
+```cairo
+// CORRECT - trait bounds as impl parameters
+impl MatrixImpl<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>> of MatrixTrait<T> {
+    // ... implementation
+}
+```
+
+Note: The `+TraitName<T>` syntax means "T must implement TraitName".
+
+### Standalone Functions Using Trait Methods
+
+**CRITICAL**: If a standalone function needs to call trait methods, it must include ALL the trait bounds required by that trait's impl. Otherwise Cairo can't resolve the method.
+
+```cairo
+// WRONG - missing bounds needed by MatrixImpl
+pub fn matrix_vector_mul<T, +Drop<T>, +Copy<T>, +Add<T>, +Mul<T>, +Zero<T>>(
+    matrix: @Matrix<T>, vector: @Vector<T>
+) -> Option<Vector<T>> {
+    // This will fail: "Method get_unchecked could not be called"
+    let val = *matrix.get_unchecked(row, col);  // Error!
+}
+
+// CORRECT - include ALL bounds from MatrixImpl, or access data directly
+pub fn matrix_vector_mul<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>>(
+    matrix: @Matrix<T>, vector: @Vector<T>
+) -> Option<Vector<T>> {
+    let val = *matrix.get_unchecked(row, col);  // Works!
+}
+
+// ALTERNATIVE - access data directly to avoid trait method calls
+pub fn matrix_vector_mul<T, +Drop<T>, +Copy<T>, +Add<T>, +Mul<T>, +Zero<T>>(
+    matrix: @Matrix<T>, vector: @Vector<T>
+) -> Option<Vector<T>> {
+    let idx = row * *matrix.cols + col;
+    let val = *matrix.data.at(to_usize(idx));  // Direct access, fewer bounds needed
 }
 ```
 

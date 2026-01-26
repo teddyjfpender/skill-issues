@@ -8,111 +8,7 @@ Task:
 - `cairo-operator-overloading`: Add, Sub, Mul trait implementations
 - `cairo-arrays`: Array operations, spans, indexing patterns
 - `cairo-testing`: Comprehensive test coverage
-
-## Overview
-
-Implement a 2D matrix type that supports basic linear algebra operations. The matrix should be generic over the element type and support common operations like addition, multiplication, transpose, and determinant calculation (for small matrices).
-
-## Type Definitions
-
-### Core Structures
-
-```cairo
-#[derive(Drop, Clone, Debug)]
-pub struct Matrix<T> {
-    pub data: Array<T>,      // Row-major storage
-    pub rows: u32,
-    pub cols: u32,
-}
-
-#[derive(Drop, Clone, Debug)]
-pub struct Vector<T> {
-    pub data: Array<T>,
-}
-```
-
-### Critical Invariants
-
-1. `data.len() == rows * cols` - Matrix storage matches dimensions
-2. `rows > 0 && cols > 0` for non-empty matrices (or both zero for empty)
-3. Row-major ordering: element at (i, j) is at index `i * cols + j`
-
-## Required Operations
-
-### Construction
-
-- `Matrix::new(rows: u32, cols: u32, data: Array<T>) -> Option<Matrix<T>>`
-  - Returns None if data.len() != rows * cols
-
-- `Matrix::zeros(rows: u32, cols: u32) -> Matrix<T>` where T: Zero + Copy + Drop
-  - Create matrix filled with zeros
-
-- `Matrix::identity(n: u32) -> Matrix<T>` where T: Zero + One + Copy + Drop
-  - Create n×n identity matrix
-
-- `Vector::new(data: Array<T>) -> Vector<T>`
-  - Create vector from array
-
-### Element Access
-
-- `get(self: @Matrix<T>, row: u32, col: u32) -> Option<@T>`
-  - Returns None if out of bounds
-
-- `get_unchecked(self: @Matrix<T>, row: u32, col: u32) -> @T`
-  - Panics if out of bounds (for internal use)
-
-### Matrix Operations
-
-- `transpose(self: @Matrix<T>) -> Matrix<T>` where T: Copy + Drop
-  - Returns transposed matrix (rows ↔ cols)
-
-- `add(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>` where T: Add + Copy + Drop
-  - Element-wise addition, None if dimensions mismatch
-
-- `sub(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>` where T: Sub + Copy + Drop
-  - Element-wise subtraction, None if dimensions mismatch
-
-- `mul(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>` where T: Add + Mul + Zero + Copy + Drop
-  - Matrix multiplication (self.cols must equal other.rows)
-  - Result is self.rows × other.cols
-
-- `scalar_mul(self: @Matrix<T>, scalar: T) -> Matrix<T>` where T: Mul + Copy + Drop
-  - Multiply every element by scalar
-
-### Vector Operations
-
-- `dot(self: @Vector<T>, other: @Vector<T>) -> Option<T>` where T: Add + Mul + Zero + Copy + Drop
-  - Dot product, None if lengths differ
-
-- `matrix_vector_mul(m: @Matrix<T>, v: @Vector<T>) -> Option<Vector<T>>`
-  - Matrix-vector multiplication (m.cols must equal v.len())
-
-### Determinant (2x2 and 3x3 only)
-
-- `det_2x2(self: @Matrix<T>) -> Option<T>` where T: Mul + Sub + Copy + Drop
-  - Returns None if not 2×2
-  - Formula: `a*d - b*c`
-
-- `det_3x3(self: @Matrix<T>) -> Option<T>` where T: Mul + Sub + Add + Copy + Drop
-  - Returns None if not 3×3
-  - Use rule of Sarrus or cofactor expansion
-
-### Utility
-
-- `rows(self: @Matrix<T>) -> u32`
-- `cols(self: @Matrix<T>) -> u32`
-- `is_square(self: @Matrix<T>) -> bool`
-- `len(self: @Vector<T>) -> u32`
-
-## Standard Trait Implementations
-
-Implement for `Matrix<T>`:
-- `PartialEq` - element-wise comparison (dimensions must match)
-- `Add` - panic wrapper around checked add
-- `Mul` - panic wrapper around checked matrix multiply
-
-Implement for `Vector<T>`:
-- `PartialEq` - element-wise comparison
+- `cairo-quirks`: Cairo-specific gotchas (snapshots, no inherent impls)
 
 ## Cairo-Specific Implementation Notes
 
@@ -121,79 +17,222 @@ Implement for `Vector<T>`:
 ```cairo
 // WRONG - will not compile
 impl Matrix<T> {
-    fn new(rows: u32, cols: u32, data: Array<T>) -> Matrix<T> { ... }
+    fn new(...) -> Matrix<T> { ... }
 }
 
 // CORRECT - define trait + impl of trait
 trait MatrixTrait<T> {
-    fn new(rows: u32, cols: u32, data: Array<T>) -> Option<Matrix<T>>;
-    fn get(self: @Matrix<T>, row: u32, col: u32) -> Option<@T>;
-    // ... other methods
+    fn new(...) -> Option<Matrix<T>>;
 }
 
 impl MatrixImpl<T, +Drop<T>, +Copy<T>> of MatrixTrait<T> {
-    fn new(rows: u32, cols: u32, data: Array<T>) -> Option<Matrix<T>> { ... }
-    fn get(self: @Matrix<T>, row: u32, col: u32) -> Option<@T> { ... }
+    fn new(...) -> Option<Matrix<T>> { ... }
 }
 ```
 
-**Calling constructors**: Call via trait name, not type:
+**Snapshot Field Access**: When `self: @Matrix<T>`, fields become snapshots. Use `*self.rows` not `self.rows`:
 ```cairo
-let m = MatrixTrait::new(3, 3, data);  // CORRECT
-// let m = Matrix::new(3, 3, data);    // WRONG - won't compile
+fn get(self: @Matrix<T>, row: u32, col: u32) -> Option<@T> {
+    if row >= *self.rows { return None; }  // Dereference with *
+    let idx = row * *self.cols + col;       // Dereference with *
+    Some(self.data[to_usize(idx)])
+}
 ```
 
-Other notes:
-- **Array indexing**: Use `.span().get(i)` for bounds-checked access
-- **Building results**: Create new Array and use `.append()` in loops
-- **Trait bounds**: Generic impls need explicit bounds like `+Drop<T>, +Copy<T>`
-- **Snapshots**: Matrix method parameters should typically be `@Matrix<T>` (snapshots)
-- **No in-place mutation**: Always return new matrices
+---
 
-## Required Tests
+## Step 1: Imports and Core Structs
 
-### Construction
-- `Matrix::new` validates dimensions correctly
-- `Matrix::zeros` creates correct zero matrix
-- `Matrix::identity` creates correct identity matrix
-- Reject invalid dimensions (data.len() != rows * cols)
+Create the foundation with imports and struct definitions.
 
-### Element Access
-- `get` returns correct elements
-- `get` returns None for out-of-bounds
-- Row-major indexing is correct
+**Requirements:**
+- Add necessary imports: `use core::array::{Array, ArrayTrait};` and `use core::num::traits::{Zero, One};`
+- Note: `Add`, `Mul`, `Sub`, `Drop`, `Copy` are in Cairo's prelude - do NOT import them
+- Define `Matrix<T>` struct with `data: Array<T>`, `rows: u32`, `cols: u32`
+- Define `Vector<T>` struct with `data: Array<T>`
+- Add `#[derive(Drop, Clone, Debug)]` to both structs
+- Add helper function `to_usize(value: u32) -> usize` for index conversion
+- Add helper function `index(row: u32, col: u32, cols: u32) -> usize` for row-major indexing
 
-### Transpose
-- `[[1,2,3],[4,5,6]]` transposed is `[[1,4],[2,5],[3,6]]`
-- Transpose of transpose equals original
-- 1×n transpose is n×1
+**Validation:** Code compiles with `scarb build`
 
-### Addition/Subtraction
-- Identity: `A + zeros == A`
-- Commutativity: `A + B == B + A`
-- Dimension mismatch returns None
+---
 
-### Multiplication
-- `A * identity == A`
-- `identity * A == A`
-- `(A * B) != (B * A)` in general (non-commutative)
-- Dimension validation: (2×3) * (3×4) = (2×4), (2×3) * (2×3) = None
+## Step 2: MatrixTrait Definition
 
-### Scalar Multiplication
-- `A * 0 == zeros`
-- `A * 1 == A`
-- `A * 2` doubles all elements
+Define the trait with all method signatures (no implementation yet).
 
-### Determinant
-- `det([[1,2],[3,4]]) == -2`
-- `det(identity_2x2) == 1`
-- `det(identity_3x3) == 1`
-- Non-square returns None
+**Requirements:**
+- Define `MatrixTrait<T>` with signatures:
+  - `fn new(rows: u32, cols: u32, data: Array<T>) -> Option<Matrix<T>>`
+  - `fn zeros(rows: u32, cols: u32) -> Matrix<T>`
+  - `fn identity(n: u32) -> Matrix<T>`
+  - `fn get(self: @Matrix<T>, row: u32, col: u32) -> Option<@T>`
+  - `fn get_unchecked(self: @Matrix<T>, row: u32, col: u32) -> @T`
+  - `fn transpose(self: @Matrix<T>) -> Matrix<T>`
+  - `fn add(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>`
+  - `fn sub(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>`
+  - `fn mul(self: @Matrix<T>, other: @Matrix<T>) -> Option<Matrix<T>>`
+  - `fn scalar_mul(self: @Matrix<T>, scalar: T) -> Matrix<T>`
+  - `fn det_2x2(self: @Matrix<T>) -> Option<T>`
+  - `fn det_3x3(self: @Matrix<T>) -> Option<T>`
+  - `fn rows(self: @Matrix<T>) -> u32`
+  - `fn cols(self: @Matrix<T>) -> u32`
+  - `fn is_square(self: @Matrix<T>) -> bool`
 
-### Vector Operations
-- Dot product of `[1,2,3]` and `[4,5,6]` equals `32`
-- Matrix-vector multiply with identity returns same vector
-- Dimension mismatches return None
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 3: Basic Matrix Implementation
+
+Implement construction and accessor methods.
+
+**Requirements:**
+- Create `impl MatrixImpl<T, +Drop<T>, +Copy<T>, +Add<T>, +Sub<T>, +Mul<T>, +Zero<T>, +One<T>> of MatrixTrait<T>`
+- Implement `new`: validate `data.len() == rows * cols`, return `Option`
+- Implement `zeros`: create matrix filled with `Zero::zero()`
+- Implement `identity`: create n×n matrix with `One::one()` on diagonal
+- Implement `get`: bounds-check, return `Option<@T>`
+- Implement `get_unchecked`: direct array access
+- Implement `rows`, `cols`, `is_square`: simple accessors using `*self.rows`, `*self.cols`
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 4: Matrix Transpose
+
+Implement transpose operation.
+
+**Requirements:**
+- Implement `transpose`: swap rows and columns
+- Build new data array by iterating columns then rows
+- Use `*self.data[index(r, c, cols)]` to access and copy elements
+- Return new Matrix with swapped dimensions
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 5: Matrix Arithmetic Operations
+
+Implement add, sub, mul, scalar_mul.
+
+**Requirements:**
+- Implement `add`: element-wise addition, return None if dimensions mismatch
+- Implement `sub`: element-wise subtraction, return None if dimensions mismatch
+- Implement `mul`: matrix multiplication (self.cols must == other.rows)
+  - Result dimensions: self.rows × other.cols
+  - Sum of products for each cell
+- Implement `scalar_mul`: multiply each element by scalar
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 6: Determinant Functions
+
+Implement 2x2 and 3x3 determinant.
+
+**Requirements:**
+- Implement `det_2x2`: return None if not 2×2, formula: `a*d - b*c`
+- Implement `det_3x3`: return None if not 3×3, use rule of Sarrus
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 7: VectorTrait and Implementation
+
+Define and implement Vector operations.
+
+**Requirements:**
+- Define `VectorTrait<T>` with:
+  - `fn new(data: Array<T>) -> Vector<T>`
+  - `fn len(self: @Vector<T>) -> u32`
+  - `fn dot(self: @Vector<T>, other: @Vector<T>) -> Option<T>`
+- Implement `VectorImpl` with all methods
+- Implement standalone `matrix_vector_mul` function
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 8: PartialEq Implementations
+
+Implement equality comparison for Matrix and Vector.
+
+**Requirements:**
+- Implement `PartialEq<Matrix<T>>`: compare dimensions, then element-wise
+- Implement `PartialEq<Vector<T>>`: compare lengths, then element-wise
+- Use snapshot parameters: `fn eq(lhs: @Matrix<T>, rhs: @Matrix<T>) -> bool`
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 9: Operator Trait Implementations
+
+Implement Add and Mul operators for Matrix.
+
+**Requirements:**
+- Implement `Add<Matrix<T>>`: wrapper around `MatrixTrait::add` that unwraps
+- Implement `Mul<Matrix<T>>`: wrapper around `MatrixTrait::mul` that unwraps
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 10: Test Module Setup
+
+Create test module with helper functions.
+
+**Requirements:**
+- Add `#[cfg(test)] mod tests { ... }`
+- Import necessary items: `Array, ArrayTrait, OptionTrait`
+- Import from super: `Matrix, MatrixTrait, Vector, VectorTrait, matrix_vector_mul`
+- Create helper: `make_matrix(rows, cols, data) -> Matrix<i32>`
+- Create helper: `make_vector(data) -> Vector<i32>`
+- Create helpers for common test data arrays
+
+**Validation:** Code compiles with `scarb build`
+
+---
+
+## Step 11: Construction Tests
+
+Test Matrix construction and accessors.
+
+**Requirements:**
+- Test `new` with valid dimensions
+- Test `new` rejects invalid dimensions
+- Test `zeros` creates correct matrix
+- Test `identity` creates correct identity
+- Test `get` returns correct elements
+- Test `get` returns None for out-of-bounds
+- Test row-major indexing is correct
+
+**Validation:** All tests pass with `snforge test`
+
+---
+
+## Step 12: Operation Tests
+
+Test all matrix and vector operations.
+
+**Requirements:**
+- Test `transpose`: verify correct transformation, transpose twice = original
+- Test `add/sub`: identity properties, commutativity, dimension mismatch → None
+- Test `mul`: identity properties, non-commutativity, dimension validation
+- Test `scalar_mul`: multiply by 0, 1, 2
+- Test `det_2x2` and `det_3x3`: known values, identity = 1, non-square → None
+- Test `Vector::dot`: known result (1·4 + 2·5 + 3·6 = 32)
+- Test `matrix_vector_mul`: identity preserves vector, dimension mismatch → None
+
+**Validation:** All tests pass with `snforge test`
+
+---
 
 ## Constraints
 
@@ -204,4 +243,4 @@ Other notes:
 
 ## Deliverable
 
-- Only the code for `src/lib.cairo`
+Complete `src/lib.cairo` with all steps implemented.

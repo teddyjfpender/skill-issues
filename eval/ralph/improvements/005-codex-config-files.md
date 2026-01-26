@@ -204,6 +204,12 @@ These serve as documentation; the actual config is applied via `-c` flags.
 - `eval/ralph/config/driver/codex.toml` - template
 - `eval/ralph/config/reviewer/codex.toml` - template
 
+## References
+
+- [Codex Advanced Configuration](https://developers.openai.com/codex/config-advanced) - Configuration file options and `-c` flag overrides
+- [Codex CLI Reference](https://developers.openai.com/codex/cli/reference) - Full CLI options including `exec` mode
+- [Codex Skills Configuration](https://developers.openai.com/codex/skills#enable-or-disable-skills) - Skills paths and enable/disable settings
+
 ## Related Issues
 
 - 003-skill-path-confusion.md (driver can't find skills)

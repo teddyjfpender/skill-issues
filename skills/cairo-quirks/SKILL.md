@@ -40,7 +40,7 @@ Cairo has Rust-like syntax but differs in important ways. This skill documents c
 ### Testing
 - **Assert messages must be literals**: `assert!(x, "msg")` not `assert!(x, variable)`.
 - **Tests need `#[test]` attribute**: Don't forget the attribute above test functions.
-- **`#[available_gas(n)]`**: Required for loops/recursion in tests.
+- **DO NOT use `#[available_gas(n)]`**: This is deprecated. Remove it entirely; snforge handles gas automatically.
 
 ### Memory and Ownership (CRITICAL)
 - **Snapshot field access**: When `self: @T`, all fields become `@Field`. Use `*self.field` to dereference.
