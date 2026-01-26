@@ -472,26 +472,40 @@ extract_code() {
 
 scaffold_project() {
   local project_dir="$1"
-  local project_name="${2:-cairo_project}"
 
   # Use scarb new to create project structure
-  if [[ -d "$project_dir" ]]; then
-    log_warn "Project directory already exists, skipping scaffold"
+  if [[ -d "$project_dir" && -f "$project_dir/Scarb.toml" ]]; then
+    log_warn "Project already exists with Scarb.toml, skipping scaffold"
     return 0
   fi
 
   local parent_dir=$(dirname "$project_dir")
+  local dir_name=$(basename "$project_dir")
+
+  # Convert dashes to underscores for valid Cairo package name
+  local package_name=$(echo "$dir_name" | tr '-' '_')
+
   mkdir -p "$parent_dir"
 
-  log_info "Scaffolding project with scarb new at $project_dir..."
+  # Remove existing directory if it exists but has no Scarb.toml
+  if [[ -d "$project_dir" ]]; then
+    rm -rf "$project_dir"
+  fi
+
+  log_info "Scaffolding project '$package_name' at $project_dir..."
 
   # Create new project with scarb
   # --no-vcs: avoid nested git repos
   # --test-runner=starknet-foundry: includes snforge_std, test scripts, snfoundry.toml
-  (cd "$parent_dir" && scarb new "$project_name" --no-vcs --test-runner=starknet-foundry) || {
+  (cd "$parent_dir" && scarb new "$package_name" --no-vcs --test-runner=starknet-foundry) || {
     log_error "Failed to create project with scarb new"
     return 1
   }
+
+  # Rename directory if package_name differs from dir_name (due to dash->underscore)
+  if [[ "$package_name" != "$dir_name" && -d "$parent_dir/$package_name" ]]; then
+    mv "$parent_dir/$package_name" "$project_dir"
+  fi
 
   log_ok "Project scaffolded with scarb new"
   return 0
@@ -936,7 +950,6 @@ while [[ $current_step -le $total_steps ]]; do
       attempt_end_time=$(date +%s)
       attempt_duration=$((attempt_end_time - attempt_start_time))
       # Escape for JSON (basic escaping)
-      local escaped_feedback
       escaped_feedback=$(echo "$error_feedback" | head -1 | tr -d '\n' | sed 's/"/\\"/g')
       record_iteration_metrics "$attempt" "failed" "[\"$escaped_feedback\"]" "$attempt_duration"
 
