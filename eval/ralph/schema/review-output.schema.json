@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Reviewer Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "issues", "notes"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["VALID", "INVALID", "UNFIXABLE"],
+      "description": "Overall validation result: VALID (meets rubric), INVALID (fixable issues), UNFIXABLE (impossible requirements)"
+    },
+    "issues": {
+      "type": "array",
+      "description": "List of issues found during review",
+      "items": {
+        "type": "object",
+        "required": ["criterion", "severity", "description", "suggestion", "line"],
+        "additionalProperties": false,
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "description": "Which rubric criterion this issue relates to"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["error", "warning"],
+            "description": "error = must fix, warning = should fix"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is wrong"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "How to fix this issue"
+          },
+          "line": {
+            "type": "integer",
+            "description": "Line number in code if applicable"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional summary or additional context"
+    }
+  }
+}

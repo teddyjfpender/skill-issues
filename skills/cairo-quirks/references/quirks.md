@@ -99,6 +99,40 @@ let ty = "foo";
 
 ## Trait and Method Issues
 
+### No Inherent Impls - Traits Required
+
+**CRITICAL**: Cairo does NOT support Rust-style inherent impls. You cannot write `impl Type { fn new() -> Self }`. All methods must be defined via traits:
+
+```cairo
+// WRONG - Cairo does NOT support this syntax
+impl Matrix {
+    fn new(rows: u32, cols: u32) -> Matrix {
+        // ...
+    }
+}
+
+// CORRECT - must use trait + impl of trait
+trait MatrixTrait {
+    fn new(rows: u32, cols: u32) -> Matrix;
+}
+
+impl MatrixImpl of MatrixTrait {
+    fn new(rows: u32, cols: u32) -> Matrix {
+        // ...
+    }
+}
+```
+
+**Calling constructors**: You must call via the trait, not the type:
+
+```cairo
+// WRONG - will not compile
+let m = Matrix::new(3, 3);
+
+// CORRECT - call via trait
+let m = MatrixTrait::new(3, 3);
+```
+
 ### Ambiguous `unwrap`
 
 When both `Option` and `Result` are in scope, `unwrap` can be ambiguous:

@@ -29,7 +29,7 @@ for line in lines:
 if current_lines or current_name is not None:
     blocks.append((current_name, current_lines))
 
-remove_sections = {"cairo", "scripts", "dependencies"}
+remove_sections = {"cairo", "scripts", "dependencies", "executable"}
 filtered_blocks: List[Tuple[Optional[str], List[str]]] = []
 for name, block_lines in blocks:
     if name in remove_sections:

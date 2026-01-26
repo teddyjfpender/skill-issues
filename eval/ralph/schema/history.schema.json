@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ralph Loop History",
+  "type": "object",
+  "required": ["prompt_id", "started_at", "status", "config", "attempts"],
+  "additionalProperties": false,
+  "properties": {
+    "prompt_id": {
+      "type": "string",
+      "description": "Unique identifier for the prompt"
+    },
+    "prompt_path": {
+      "type": "string",
+      "description": "Path to the prompt file"
+    },
+    "rubric_path": {
+      "type": "string",
+      "description": "Path to the rubric file"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the loop started"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the loop ended"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "success", "failure", "unfixable"],
+      "description": "Current loop status"
+    },
+    "successful_attempt": {
+      "type": "integer",
+      "description": "Which attempt number succeeded (if any)"
+    },
+    "config": {
+      "type": "object",
+      "description": "Configuration used for this run",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "type": "integer"
+        },
+        "driver_backend": {
+          "type": "string",
+          "enum": ["codex", "claude"]
+        },
+        "driver_model": {
+          "type": "string"
+        },
+        "driver_skills": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reviewer_backend": {
+          "type": "string",
+          "enum": ["codex", "claude"]
+        },
+        "reviewer_model": {
+          "type": "string"
+        },
+        "reviewer_skills": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pre_validate": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "description": "Record of each attempt",
+      "items": {
+        "type": "object",
+        "required": ["number", "started_at"],
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "Attempt number (1-indexed)"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "driver_result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code_path": {
+                "type": "string",
+                "description": "Path to generated code"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Driver's notes"
+              },
+              "exit_code": {
+                "type": "integer"
+              }
+            }
+          },
+          "review_result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["VALID", "INVALID", "UNFIXABLE"]
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          },
+          "verify_result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["pass", "fail"]
+              },
+              "failed_steps": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "verify_json_path": {
+                "type": "string"
+              }
+            }
+          },
+          "feedback": {
+            "type": "object",
+            "description": "Extracted feedback for next attempt",
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["reviewer", "format", "build", "test"],
+                "description": "Where the feedback came from"
+              },
+              "summary": {
+                "type": "string",
+                "description": "Brief summary of the issue"
+              },
+              "errors": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Raw error messages"
+              },
+              "actionable_hints": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Specific suggestions for fixing"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

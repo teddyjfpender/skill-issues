@@ -16,6 +16,7 @@ See `eval/harness.md` for the rationale and the longer-term "best-in-class" dire
 - `eval/run-prompt.sh` - End-to-end: run Codex on a prompt, capture logs/JSON, write code, then verify.
 - `eval/record_step.py` + `eval/steps_to_verify.py` - Build `verify.json`.
 - `eval/schema/code-output.schema.json` - Default JSON schema for structured output.
+- `eval/ralph/` - Multi-agent loop with driver/reviewer co-piloting (see `eval/ralph/README.md`).
 
 ## One-shot evaluation loop
 
@@ -84,6 +85,31 @@ This writes:
 Example prompt included:
 - `eval/prompts/cairo-generics-traits-01.md`
 - `eval/rubric/cairo-generics-traits-01.md`
+
+## Multi-Agent Loop (Ralph Loop)
+
+For iterative code generation with a driver/reviewer co-pilot pattern:
+
+```bash
+eval/ralph/ralph-loop.sh \
+  --prompt cairo-generics-traits-01 \
+  --rubric cairo-generics-traits-01 \
+  --driver-backend codex \
+  --driver-skills "cairo-generics-traits" \
+  --reviewer-backend claude \
+  --max-attempts 5
+```
+
+This orchestrates:
+1. **Driver** generates code based on prompt + feedback from previous attempts
+2. **Reviewer** validates code against rubric before expensive build/test
+3. **Verification** runs scarb fmt, build, test
+4. **Feedback extraction** parses errors into actionable hints
+5. Loops until success or max attempts exhausted
+
+State is stored in `.ralph/<prompt-id>/` with full attempt history.
+
+See `eval/ralph/README.md` for full documentation.
 
 ## Cleanup
 

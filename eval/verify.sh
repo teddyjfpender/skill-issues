@@ -54,7 +54,10 @@ run_step() {
 }
 
 has_tests() {
-  find "$project_dir" -type f -path "*/tests/*.cairo" -print -quit 2>/dev/null | grep -q .
+  # Check for tests directory OR inline #[test] attributes in source files
+  find "$project_dir" -type f -path "*/tests/*.cairo" -print -quit 2>/dev/null | grep -q . && return 0
+  grep -rq '#\[test\]' "$project_dir/src" 2>/dev/null && return 0
+  return 1
 }
 
 if [[ ! -f "$project_dir/Scarb.toml" ]]; then
