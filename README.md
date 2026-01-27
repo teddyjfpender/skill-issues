@@ -9,7 +9,7 @@
 ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝     ╚═╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝╚══════╝
 ```
 
-**AI Code Generation Evaluation Framework**
+**DSL AI Code Generation Evaluation Framework**
 
 </div>
 
