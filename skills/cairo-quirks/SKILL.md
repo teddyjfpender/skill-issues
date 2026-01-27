@@ -95,6 +95,12 @@ arr.append(new_value);
 - **i32 for comparisons**: Return `i32` from comparison functions, not `bool`.
 - **felt252 is not an integer**: Different semantics, be careful with arithmetic.
 
+### String Literals (CRITICAL)
+- **Short strings max 31 characters**: `felt252` can only hold 31 ASCII chars. Longer strings cause compilation error.
+- **Error messages must be short**: `assert(cond, 'max 31 chars here')` - use abbreviations if needed.
+- **Common error**: `The value does not fit within the range of type core::felt252` means your string is too long.
+- **Workaround**: Use short codes like `'err: duplicate'` instead of `'Beneficiary already has schedule'`.
+
 ### Testing
 - **Assert messages must be literals**: `assert!(x, "msg")` not `assert!(x, variable)`.
 - **Tests need `#[test]` attribute**: Don't forget the attribute above test functions.

@@ -8,7 +8,12 @@
 # Usage:
 #   step-loop.sh --prompt <path> --rubric <path> --work-dir <path> \
 #                --state-dir <path> --backend <codex|claude> --model <model> \
-#                [--skills <skills>] [--max-retries <n>]
+#                [--skills <skills>] [--max-retries <n>] [--contract]
+#
+# Options:
+#   --contract    After successful code generation, run the TypeScript bindings
+#                 pipeline to generate providers, declare, deploy, and test
+#                 the contract on devnet. See tools/ts-bindings/README.md
 #
 # Exit codes:
 #   0 - All steps completed successfully
@@ -132,6 +137,8 @@ metrics_enabled=1
 project_type="library"  # library or contract
 cleanup_cache=0  # Whether to cleanup isolated cache on success
 use_multi_file=0  # Whether to use modular multi-file structure
+run_contract_pipeline=0  # Whether to run TypeScript bindings pipeline after successful completion
+restart_mode=0  # Whether to delete existing state and start fresh
 
 # Offline flag for scarb (set after checking support)
 SCARB_OFFLINE_FLAG=""
@@ -160,6 +167,9 @@ Options:
   --no-metrics          Disable metrics tracking
   --cleanup-cache       Clean up isolated cache directory on successful completion
   --multi-file          Use modular multi-file structure (src/solution.cairo, tests/test_lib.cairo)
+  --contract            Run TypeScript bindings pipeline after successful completion
+                        (generates TS providers, declares, deploys, and tests on devnet)
+  --restart             Delete existing state and start fresh (default: resume if state exists)
 EOF
 }
 
@@ -179,6 +189,8 @@ while [[ $# -gt 0 ]]; do
     --no-metrics) metrics_enabled=0; shift ;;
     --cleanup-cache) cleanup_cache=1; shift ;;
     --multi-file) use_multi_file=1; shift ;;
+    --contract) run_contract_pipeline=1; shift ;;
+    --restart) restart_mode=1; shift ;;
     --help|-h) usage; exit 0 ;;
     *) log_error "Unknown argument: $1"; usage >&2; exit 2 ;;
   esac
@@ -237,9 +249,25 @@ setup_isolated_environment() {
   mkdir -p "$SCARB_CACHE"
   log_info "Using isolated Scarb cache: $SCARB_CACHE"
 
-  # Optionally set CAIRO_PATH if needed for custom dependencies
-  # export CAIRO_PATH="$state_dir/.cairo-path"
-  # mkdir -p "$CAIRO_PATH"
+  # Symlink the plugins directory from the system Scarb cache
+  # This is necessary because snforge_scarb_plugin is a compiled Rust dylib
+  # that can't be easily rebuilt in isolation
+  local system_cache=""
+  if [[ "$(uname)" == "Darwin" ]]; then
+    system_cache="$HOME/Library/Caches/com.swmansion.scarb"
+  else
+    system_cache="${XDG_CACHE_HOME:-$HOME/.cache}/scarb"
+  fi
+
+  if [[ -d "$system_cache/plugins" ]]; then
+    if [[ ! -e "$SCARB_CACHE/plugins" ]]; then
+      ln -s "$system_cache/plugins" "$SCARB_CACHE/plugins"
+      log_info "Symlinked plugins from system cache"
+    fi
+  else
+    log_warn "System Scarb plugins directory not found at $system_cache/plugins"
+    log_warn "snforge tests may fail if plugins are not available"
+  fi
 
   # Check for offline flag support
   check_offline_support
@@ -251,6 +279,10 @@ cleanup_isolated_cache() {
 
   if [[ -d "$cache_dir" ]]; then
     log_info "Cleaning up isolated cache directory: $cache_dir"
+    # Remove symlinks first to avoid deleting system cache contents
+    if [[ -L "$cache_dir/plugins" ]]; then
+      rm "$cache_dir/plugins"
+    fi
     rm -rf "$cache_dir"
     log_ok "Cache cleanup complete"
   fi
@@ -1241,12 +1273,25 @@ if ! verify_project_setup "$work_dir" "$setup_error_file"; then
   exit 2
 fi
 
+# Handle restart mode - delete existing state if requested
+if [[ "$restart_mode" -eq 1 ]]; then
+  if [[ -d "$state_dir" ]]; then
+    log_info "Restart mode: clearing existing state"
+    # Remove state file and step directories, but preserve cache symlinks
+    rm -f "$state_dir/step-state.json"
+    rm -f "$state_dir/metrics.json"
+    rm -rf "$state_dir"/step-*
+    rm -f "$state_dir"/verified-*.cairo
+    rm -f "$state_dir"/*.json 2>/dev/null || true
+  fi
+fi
+
 # Initialize metrics tracking
 init_metrics
 
 # Load or initialize state
 state_file="$state_dir/step-state.json"
-if [[ -f "$state_file" ]]; then
+if [[ -f "$state_file" && "$restart_mode" -eq 0 ]]; then
   current_step=$(jq -r '.current_step // 1' "$state_file")
   accumulated_code=$(jq -r '.accumulated_code // ""' "$state_file")
 
@@ -1260,7 +1305,7 @@ if [[ -f "$state_file" ]]; then
     fi
   fi
 
-  log_info "Resuming from step $current_step"
+  log_info "Resuming from step $current_step (use --restart to start fresh)"
 else
   current_step=1
   accumulated_code=""
@@ -1540,6 +1585,34 @@ log_ok "Final code saved to $final_code_path"
 # Finalize and display metrics (pass total_steps as steps_completed for successful runs)
 finalize_metrics "pass" "$final_code_path" "$total_steps"
 print_metrics_summary
+
+# Run TypeScript bindings pipeline if --contract flag was set
+if [[ "$run_contract_pipeline" -eq 1 ]]; then
+  echo ""
+  log_info "Running TypeScript bindings pipeline..."
+
+  # Determine paths
+  ts_bindings_script="$script_dir/../../tools/ts-bindings/pipeline.sh"
+  ts_output_dir="$state_dir/typescript"
+
+  if [[ ! -f "$ts_bindings_script" ]]; then
+    log_error "TypeScript bindings pipeline not found at: $ts_bindings_script"
+    log_warn "Skipping contract pipeline"
+  else
+    # Run the pipeline (contract is already built in work_dir)
+    if "$ts_bindings_script" "$work_dir" "$ts_output_dir"; then
+      log_ok "TypeScript bindings pipeline completed successfully"
+      log_info "TypeScript project: $ts_output_dir"
+      log_info "Test results: $ts_output_dir/test-results.log"
+    else
+      log_error "TypeScript bindings pipeline failed"
+      log_info "Check logs at: $ts_output_dir/test-results.log"
+      log_info "Devnet logs at: $ts_output_dir/devnet.log"
+      # Don't fail the whole run, just warn
+      log_warn "Contract pipeline failed but Cairo code generation succeeded"
+    fi
+  fi
+fi
 
 # Optional cleanup of isolated cache directory
 if [[ "$cleanup_cache" -eq 1 ]]; then
