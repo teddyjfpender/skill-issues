@@ -195,7 +195,8 @@ if [[ -z "$model" ]]; then
   if [[ "$backend" == "codex" ]]; then
     model="o3"
   else
-    model="claude-sonnet-4-20250514"
+    # Default to Opus with extended thinking, fallback to standard Opus
+    model="claude-opus-4-5-20251101"
   fi
 fi
 
@@ -321,6 +322,52 @@ extract_preamble() {
 # Skill Loading
 # ============================================================
 
+# Load only essential sections from a skill (Quick Use, Response Checklist)
+# This avoids dumping 500+ lines per skill into context
+load_skill_essentials() {
+  local skill_name="$1"
+  local skill_dir="$script_dir/../../skills/$skill_name"
+  local skill_file="$skill_dir/SKILL.md"
+
+  if [[ -f "$skill_file" ]]; then
+    echo "### $skill_name"
+    echo ""
+    # Extract Quick Use and Response Checklist sections using Python
+    python3 - "$skill_file" <<'PYEOF'
+import sys
+import re
+
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+
+# Remove YAML frontmatter
+content = re.sub(r'^---\n.*?\n---\n', '', content, flags=re.DOTALL)
+
+# Extract specific sections
+sections_to_extract = [
+    r'## Quick Use\n(.*?)(?=\n## |\Z)',
+    r'## Response Checklist\n(.*?)(?=\n## |\Z)',
+    r'## CRITICAL[^\n]*\n(.*?)(?=\n## |\Z)',
+]
+
+output = []
+for pattern in sections_to_extract:
+    match = re.search(pattern, content, re.DOTALL)
+    if match:
+        output.append(match.group(0).strip())
+
+if output:
+    print('\n\n'.join(output))
+else:
+    # Fallback: print first 50 lines if no sections found
+    lines = content.strip().split('\n')[:50]
+    print('\n'.join(lines))
+PYEOF
+    echo ""
+  fi
+}
+
+# Load full skill content (use sparingly - wastes tokens)
 load_skill_content() {
   local skill_name="$1"
   local skill_dir="$script_dir/../../skills/$skill_name"
@@ -371,15 +418,13 @@ build_step_prompt() {
     echo "If you run more than 2 commands before generating code, you are doing it wrong."
     echo ""
 
-    # Embed skill content directly
+    # Load condensed skill content (Quick Use + Response Checklist only)
     if [[ -n "$skills" ]]; then
       echo "## Cairo Language Reference"
       echo ""
-      echo "Use this reference for correct Cairo syntax. DO NOT search for anything else."
-      echo ""
       IFS=',' read -ra skill_arr <<< "$skills"
       for s in "${skill_arr[@]}"; do
-        load_skill_content "$s"
+        load_skill_essentials "$s"
       done
     fi
 

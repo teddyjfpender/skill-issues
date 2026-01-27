@@ -56,7 +56,7 @@ show_help() {
   echo ""
   echo -e "${BOLD}OPTIONS${NC}"
   echo "    -b, --backend <name>     LLM backend: claude, codex (default: claude)"
-  echo "    -m, --model <name>       Model identifier (default: claude-sonnet-4-20250514)"
+  echo "    -m, --model <name>       Model identifier (default: claude-opus-4-5-20251101)"
   echo "    -s, --skills <list>      Comma-separated skills (default: cairo-quirks,cairo-quality)"
   echo "    --multi-file             Enable modular file structure (default: enabled)"
   echo "    --single-file            Disable modular file structure"
@@ -133,7 +133,7 @@ find_rubric() {
 cmd_run() {
   local prompt_id=""
   local backend="claude"
-  local model="claude-sonnet-4-20250514"
+  local model="claude-opus-4-5-20251101"
   local skills="cairo-quirks,cairo-quality"
   local multi_file=1
   local max_retries=3
