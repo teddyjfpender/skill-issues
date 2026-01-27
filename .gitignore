@@ -8,3 +8,10 @@ Scarb.lock
 
 # state files
 .state
+
+# typescript
+node_modules
+
+# test contract flows
+my_contract
+my_contract_ts
