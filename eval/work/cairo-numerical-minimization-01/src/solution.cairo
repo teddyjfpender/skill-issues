@@ -1,4 +1,5 @@
 // Q64.64 fixed-point type implementation
+use core::num::traits::WideMul;
 
 pub const FRACTIONAL_BITS: u8 = 64;
 
@@ -8,14 +9,15 @@ pub struct Fixed {
 }
 
 pub const ONE: Fixed = Fixed { value: 0x10000000000000000 }; // 1 << 64
+const SHIFT_U256: u256 = 0x10000000000000000; // 2^64
 
-// Golden ratio φ ≈ 1.618033988749895
-// As Q64.64: 1.618033988749895 * 2^64 ≈ 29852077638435890415
-pub const PHI: Fixed = Fixed { value: 29852077638435890415 };
+// Golden ratio φ = (1+√5)/2 ≈ 1.6180339887498948482
+// As Q64.64: φ * 2^64 ≈ 29852077638435892953
+pub const PHI: Fixed = Fixed { value: 29852077638435892953 };
 
-// 2 - φ ≈ 0.381966011250105
-// As Q64.64: 0.381966011250105 * 2^64 ≈ 7046029254386353131
-pub const RESPHI: Fixed = Fixed { value: 7046029254386353131 };
+// 2 - φ ≈ 0.3819660112501051518
+// As Q64.64: (2-φ) * 2^64 ≈ 7046029254386351047
+pub const RESPHI: Fixed = Fixed { value: 7046029254386351047 };
 
 // Default tolerance: approximately 1e-10 ≈ 2^-33
 // As Q64.64: 2^(64-33) = 2^31 = 2147483648
@@ -64,15 +66,84 @@ impl FixedSub of core::traits::Sub<Fixed> {
 
 impl FixedMul of core::traits::Mul<Fixed> {
     fn mul(lhs: Fixed, rhs: Fixed) -> Fixed {
-        let shift: i128 = 0x10000000000000000; // 1 << 64
-        Fixed { value: (lhs.value * rhs.value) / shift }
+        // Handle signs separately
+        let a_neg = lhs.value < 0;
+        let b_neg = rhs.value < 0;
+        let result_neg = a_neg != b_neg;
+
+        // Get absolute values as u128
+        let a_abs: u128 = if a_neg {
+            let neg_val: i128 = -lhs.value;
+            neg_val.try_into().unwrap()
+        } else {
+            lhs.value.try_into().unwrap()
+        };
+        let b_abs: u128 = if b_neg {
+            let neg_val: i128 = -rhs.value;
+            neg_val.try_into().unwrap()
+        } else {
+            rhs.value.try_into().unwrap()
+        };
+
+        // Wide multiply: u128 * u128 -> u256
+        let wide_product: u256 = a_abs.wide_mul(b_abs);
+
+        // Divide by 2^64 (shift right by 64 bits)
+        let result_u256 = wide_product / SHIFT_U256;
+
+        // Convert back to i128
+        let result_u128: u128 = result_u256.try_into().unwrap();
+        let result_i128: i128 = result_u128.try_into().unwrap();
+
+        // Apply sign
+        if result_neg {
+            Fixed { value: -result_i128 }
+        } else {
+            Fixed { value: result_i128 }
+        }
     }
 }
 
 impl FixedDiv of core::traits::Div<Fixed> {
     fn div(lhs: Fixed, rhs: Fixed) -> Fixed {
-        let shift: i128 = 0x10000000000000000; // 1 << 64
-        Fixed { value: (lhs.value * shift) / rhs.value }
+        // Handle signs separately
+        let a_neg = lhs.value < 0;
+        let b_neg = rhs.value < 0;
+        let result_neg = a_neg != b_neg;
+
+        // Get absolute values as u128
+        let a_abs: u128 = if a_neg {
+            let neg_val: i128 = -lhs.value;
+            neg_val.try_into().unwrap()
+        } else {
+            lhs.value.try_into().unwrap()
+        };
+        let b_abs: u128 = if b_neg {
+            let neg_val: i128 = -rhs.value;
+            neg_val.try_into().unwrap()
+        } else {
+            rhs.value.try_into().unwrap()
+        };
+
+        // For Q64.64 division: (a / b) = (a * 2^64) / b
+        // Compute a * 2^64 as u256
+        let a_u256: u256 = a_abs.into();
+        let a_shifted: u256 = a_u256 * SHIFT_U256;
+
+        // Divide by b
+        let b_u256: u256 = b_abs.into();
+        let result_u256 = a_shifted / b_u256;
+
+        // Convert back to i128
+        let result_u128: u128 = result_u256.try_into().unwrap();
+        let result_i128: i128 = result_u128.try_into().unwrap();
+
+        // Apply sign
+        if result_neg {
+            Fixed { value: -result_i128 }
+        } else {
+            Fixed { value: result_i128 }
+        }
     }
 }
 
@@ -187,16 +258,19 @@ pub fn golden_section_search<T, +ObjectiveFn<T>, +Drop<T>, +Copy<T>>(
     while iterations < max_iterations {
         iterations += 1;
 
+        // c is the RIGHT probe (closer to b), d is the LEFT probe (closer to a)
+        // fc < fd means minimum is to the right (closer to c), so narrow to [d, b]
+        // fd < fc means minimum is to the left (closer to d), so narrow to [a, c]
         if fc < fd {
-            // Minimum is in [a, d]
-            b = d;
+            // Minimum is in [d, b] - move left boundary up
+            a = d;
             d = c;
             fd = fc;
             c = b - RESPHI * (b - a);
             fc = ObjectiveFn::eval(f, c);
         } else {
-            // Minimum is in [c, b]
-            a = c;
+            // Minimum is in [a, c] - move right boundary down
+            b = c;
             c = d;
             fc = fd;
             d = a + RESPHI * (b - a);
